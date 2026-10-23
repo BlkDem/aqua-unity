@@ -1,10 +1,16 @@
-# Tests on every push; a Windows build on main. Uses GameCI (https://game.ci).
+# Tests on every push (without the LFS models: tests do not need them, and GitHub's free LFS
+# bandwidth is 1 GB a month); a Windows build for release tags (v*) or on demand. GameCI.
 # Secrets: UNITY_EMAIL, UNITY_PASSWORD — a Unity Personal seat (see README).
 name: CI
 
 on:
   push:
   workflow_dispatch:
+    inputs:
+      build:
+        description: Also build for Windows
+        type: boolean
+        default: true
 
 jobs:
   test:
@@ -12,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          lfs: true
+          lfs: false
       - uses: actions/cache@v4
         with:
           path: Library
@@ -27,7 +33,7 @@ jobs:
           githubToken: ${{ secrets.GITHUB_TOKEN }}
 
   build-windows:
-    if: github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.build
     needs: test
     runs-on: ubuntu-latest
     steps:

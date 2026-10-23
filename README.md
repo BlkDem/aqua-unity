@@ -62,7 +62,7 @@ Assets/Settings/     URP: профили качества PC/Mobile, Volume
 
 ## CI
 
-`.github/workflows/ci.yml` (GameCI): на каждый пуш — EditMode-тесты, в `main` — ещё и сборка под Windows (артефакт `Aquarium-Windows`). Нужны секреты репозитория — учётная запись Unity, на которой активирована лицензия Personal:
+`.github/workflows/ci.yml` (GameCI): на каждый пуш — EditMode-тесты (без LFS-моделей, они тестам не нужны); сборка под Windows (артефакт `Aquarium-Windows`) — на теги `v*` и по кнопке Run workflow. Так экономится LFS-трафик: у бесплатного GitHub это 1 ГБ в месяц, а модели весят ~180 МБ. Нужны секреты репозитория — учётная запись Unity, на которой активирована лицензия Personal:
 
 ```powershell
 gh secret set UNITY_EMAIL -R BlkDem/aqua-unity
