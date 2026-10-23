@@ -1,5 +1,5 @@
 # Tests on every push; a Windows build on main. Uses GameCI (https://game.ci).
-# Secrets: UNITY_EMAIL, UNITY_PASSWORD, UNITY_LICENSE (see README).
+# Secrets: UNITY_EMAIL, UNITY_PASSWORD — a Unity Personal seat (see README).
 name: CI
 
 on:
@@ -20,7 +20,6 @@ jobs:
           restore-keys: Library-
       - uses: game-ci/unity-test-runner@v4
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
@@ -42,7 +41,6 @@ jobs:
           restore-keys: Library-
       - uses: game-ci/unity-builder@v4
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:

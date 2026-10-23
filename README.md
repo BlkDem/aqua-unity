@@ -42,10 +42,14 @@ Assets/Settings/     URP: профили качества PC/Mobile, Volume
 
 ## CI
 
-`.github/workflows/ci.yml` (GameCI): на каждый пуш — EditMode-тесты, в `main` — ещё и сборка под Windows (артефакт `Aquarium-Windows`). Нужны секреты репозитория:
+`.github/workflows/ci.yml` (GameCI): на каждый пуш — EditMode-тесты, в `main` — ещё и сборка под Windows (артефакт `Aquarium-Windows`). Нужны секреты репозитория — учётная запись Unity, на которой активирована лицензия Personal:
 
-- `UNITY_EMAIL`, `UNITY_PASSWORD` — учётная запись Unity
-- `UNITY_LICENSE` — содержимое файла лицензии Personal (`.ulf`); как его получить — https://game.ci/docs/github/activation
+```powershell
+gh secret set UNITY_EMAIL -R BlkDem/aqua-unity
+gh secret set UNITY_PASSWORD -R BlkDem/aqua-unity
+```
+
+(каждая команда спросит значение; оно не попадает ни в историю, ни в логи). GameCI входит под этой учётной записью и возвращает место лицензии после прогона. Учётная запись с включённой двухфакторной аутентификацией так не войдёт — для CI тогда нужна отдельная учётная запись Unity без 2FA.
 
 ## Соглашения
 
