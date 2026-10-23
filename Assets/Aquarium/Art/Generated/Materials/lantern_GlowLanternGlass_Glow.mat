@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: lantern_GlowLanternGlass_Glow
+  m_Shader: {fileID: 4800000, guid: 5e722069429dbce4fa170af8820cfd58, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords:
+  - _USEFOG_ON
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: 2000
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OrmMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaClip: 0
+    - _BumpScale: 1
+    - _CausticStrength: 0
+    - _Cull: 0
+    - _Cutoff: 0.5
+    - _Metallic: 0
+    - _Roughness: 0.2
+    - _Sway: 0
+    - _SwayFromUV3: 0
+    - _UseFog: 1
+    - _VertexColor: 0
+    m_Colors:
+    - _BaseColor: {r: 1, g: 0.8279951, b: 0.54591507, a: 1}
+    - _EmissionColor: {r: 0.8441468, g: 0.37338546, b: 0.055505924, a: 0.8441468}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

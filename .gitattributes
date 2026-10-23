@@ -171,3 +171,6 @@ Packages/packages-lock.json linguist-generated
 
 # Exceptions for .asset files such as lightning pre-baking
 LightingData.asset     binary
+
+# meshes made by Aquarium > Build Scene (big, rebuilt by the scene builder)
+Assets/Aquarium/Art/Generated/Meshes/*.asset lfs

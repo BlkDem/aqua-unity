@@ -1,0 +1,21 @@
+{
+    "name": "Aquarium.Editor",
+    "rootNamespace": "Aquarium.EditorTools",
+    "references": [
+        "Aquarium.Life",
+        "Aquarium.World",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Core.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
