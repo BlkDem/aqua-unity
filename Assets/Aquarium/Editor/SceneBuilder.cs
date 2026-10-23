@@ -82,6 +82,7 @@ namespace Aquarium.EditorTools
             BuildRaysAndDust();
             BuildCameraAndPost();
             BakeEnvironment();
+            BuildApp();
             day.mode = DayCycle.Mode.Day;
             day.Snap();
         }
@@ -495,6 +496,12 @@ namespace Aquarium.EditorTools
                 m.localRotation = Rot(R(-0.2f, 0.2f), R(0, 6), R(-0.2f, 0.2f));
                 m.localScale = Vector3.one * R(0.8f, 1.3f);
             }
+            // small aerator stone in the back left corner (bubbles stream from it)
+            {
+                float x = -2.65f, z = -2.05f;
+                layout.aerator = P(x, Sand(x, z) + 0.05f, z);
+                Obj("AeratorStone", decor, SaveMesh(MeshGen.Cylinder(0.12f, 0.1f, 0.08f, 16, "AeratorStone")), Materials.NewLit("AeratorStone", Hex("#4a4f57"), 0.9f), P(x, Sand(x, z) + 0.02f, z));
+            }
             // open-water places (for explorers)
             Spot("у поверхности", 0, 5.0f, 0.2f, "open", 1.5f);
             Spot("у фильтра", 4.9f, 4.6f, -1.3f, "filter", 0.6f);
@@ -565,13 +572,16 @@ namespace Aquarium.EditorTools
             return go;
         }
 
+        static void Clump(string name, float x, float z, float radius) =>
+            layout.clumps.Add(new Spot { name = name, position = P(x, Sand(x, z) + 0.6f, z), kind = "plants", radius = radius });
+
         static void BuildPlants()
         {
-            foreach (var (x, z) in new[] { (-5.3f, -2.0f), (-5.6f, -0.6f), (-2.6f, -2.05f), (-1.6f, -1.9f), (1.2f, -2.15f), (5.55f, -2.15f), (-0.4f, -2.1f), (3.5f, -2.15f) }) Plant("vallisneria", x, z);
-            foreach (var (x, z) in new[] { (-2.95f, 0.4f), (-4.4f, 0.45f), (-0.5f, 0.95f), (5.0f, 0.35f) }) Plant("sword", x, z, 0.95f);
-            foreach (var (x, z) in new[] { (-3.5f, 1.0f), (2.6f, 1.15f), (-1.9f, 1.35f), (4.4f, 1.6f) }) Plant("crypt", x, z, 1.1f);
-            foreach (var (x, z, kind) in new[] { (-5.55f, -1.75f, "ludwigia"), (-1.25f, -2.15f, "limnophila"), (0.9f, -1.0f, "ludwigia"), (-5.4f, 0.9f, "limnophila") }) Plant(kind, x, z);
-            foreach (var (x, z) in new[] { (-3.3f, -2.25f), (2.7f, -2.2f), (-1.1f, -1.4f) }) Plant("cabomba", x, z);
+            foreach (var (x, z) in new[] { (-5.3f, -2.0f), (-5.6f, -0.6f), (-2.6f, -2.05f), (-1.6f, -1.9f), (1.2f, -2.15f), (5.55f, -2.15f), (-0.4f, -2.1f), (3.5f, -2.15f) }) { Plant("vallisneria", x, z); Clump("заросли валлиснерии", x, z + 0.3f, 0.6f); }
+            foreach (var (x, z) in new[] { (-2.95f, 0.4f), (-4.4f, 0.45f), (-0.5f, 0.95f), (5.0f, 0.35f) }) { Plant("sword", x, z, 0.95f); Clump("куст эхинодоруса", x, z, 0.7f); }
+            foreach (var (x, z) in new[] { (-3.5f, 1.0f), (2.6f, 1.15f), (-1.9f, 1.35f), (4.4f, 1.6f) }) { Plant("crypt", x, z, 1.1f); Clump("криптокорина", x, z, 0.4f); }
+            foreach (var (x, z, kind) in new[] { (-5.55f, -1.75f, "ludwigia"), (-1.25f, -2.15f, "limnophila"), (0.9f, -1.0f, "ludwigia"), (-5.4f, 0.9f, "limnophila") }) { Plant(kind, x, z); Clump(kind == "ludwigia" ? "красные стебли" : "лимнофила", x, z, 0.5f); }
+            foreach (var (x, z) in new[] { (-3.3f, -2.25f), (2.7f, -2.2f), (-1.1f, -1.4f) }) { Plant("cabomba", x, z); Clump("кабомба", x, z + 0.3f, 0.5f); }
             // anubias tied to driftwood and stones
             foreach (var (x, z) in new[] { (-0.6f, -1.3f), (1.4f, -1.45f), (-3.0f, 1.15f), (3.0f, 1.6f) })
             {
@@ -710,6 +720,7 @@ namespace Aquarium.EditorTools
                 m.transform.localPosition = P(x, Sand(x, z) - 0.03f, z);
                 m.transform.localRotation = Yaw(R(0, Mathf.PI * 2));
                 Glowing(m, glow, $"c{k}");
+                Clump("коралл", x, z, 0.4f);
             }
             var brain = Node("corals", "Brain", plants);
             brain.transform.localPosition = P(-0.2f, Sand(-0.2f, 1.75f) - 0.03f, 1.75f);
@@ -721,6 +732,7 @@ namespace Aquarium.EditorTools
             Node("corals", "SwayAnemone", anem);
             Glowing(anem.gameObject, "#ff63c8", "anemone");
             layout.anemone = P(1.3f, Sand(1.3f, 0.75f) + 0.35f, 0.75f);
+            Clump("актиния", 1.3f, 0.75f, 0.35f);
         }
 
         /// <summary>
@@ -794,6 +806,21 @@ namespace Aquarium.EditorTools
             dust.bounds = new Bounds(P(0, 3, 0), new Vector3(W + 2, H + 2, D + 2));
             day.dust = Materials.NewShader("Dust", "Aquarium/Dust");
             Obj("Dust", fx, SaveMesh(dust), day.dust, Vector3.zero, null, false).GetComponent<MeshRenderer>().receiveShadows = false;
+        }
+
+        // ------------------------------------------------------------------ the living part
+        static void BuildApp()
+        {
+            var go = new GameObject("App");
+            go.transform.SetParent(root, false);
+            var app = go.AddComponent<Aquarium.Fish.AquariumApp>();
+            app.fishModels = FishModelBuilder.Build();
+            app.layout = layout;
+            app.day = day;
+            app.foodMesh = SaveMesh(MeshGen.Cylinder(1, 1, 0.35f, 7, "Food"));
+            app.foodMaterial = Materials.NewLit("Food", Color.white, 0.7f, emission: Hex("#331100") * 0.4f, caustics: 0.5f);
+            app.bubbleMesh = SaveMesh(MeshGen.Sphere(1, 12, 8, "Bubble"));
+            app.bubbleMaterial = Materials.NewShader("Bubble", "Aquarium/Bubble");
         }
 
         // ------------------------------------------------------------------ camera and post

@@ -27,8 +27,10 @@ namespace Aquarium.World
     public sealed class AquariumLayout : MonoBehaviour
     {
         public List<Spot> spots = new List<Spot>();
+        [Tooltip("Plant clumps fish swim around (also places with kind 'plants')")]
+        public List<Spot> clumps = new List<Spot>();
         public List<Obstacle> obstacles = new List<Obstacle>();
-        public Vector3 filterOutlet, filterIntake, diverHelmet, woodCenter, anemone, secretCave, chestPosition;
+        public Vector3 filterOutlet, filterIntake, diverHelmet, woodCenter, anemone, secretCave, chestPosition, aerator;
         public Transform chestLid, duck;
         [Tooltip("Colliders of things critters can walk on (decor tops); the sand is analytic")]
         public LayerMask walkable = ~0;

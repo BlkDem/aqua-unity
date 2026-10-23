@@ -41,6 +41,7 @@ namespace Aquarium.EditorTools
                 old.CopyPropertiesFromMaterial(m);
                 old.shaderKeywords = m.shaderKeywords;
                 old.renderQueue = m.renderQueue;
+                old.enableInstancing = m.enableInstancing;
                 EditorUtility.SetDirty(old);
                 Object.DestroyImmediate(m);
                 return old;
@@ -82,7 +83,7 @@ namespace Aquarium.EditorTools
 
         public static Material NewShader(string name, string shader)
         {
-            var m = new Material(Shader.Find(shader));
+            var m = new Material(Shader.Find(shader)) { enableInstancing = true };
             return Save(name, m);
         }
 

@@ -2,6 +2,7 @@
 // shots (Docs/reference), into Docs/unity, for side-by-side comparison.
 //   -executeMethod Aquarium.EditorTools.Snapshot.BuildAndRender
 using System.IO;
+using System.Linq;
 using Aquarium.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -30,6 +31,11 @@ namespace Aquarium.EditorTools
             var clock = Object.FindFirstObjectByType<AquariumClock>();
             cam.GetComponent<OrbitCamera>().enabled = false;
             clock.Apply(12);
+            // a fresh aquarium in memory (the real save is not touched), alive for a while
+            var app = Object.FindFirstObjectByType<Aquarium.Fish.AquariumApp>();
+            app?.Boot(new Aquarium.Life.MemoryWorldStore());
+            UnityEngine.Random.InitState(7);
+            for (int i = 0; i < 900 && app; i++) app.Simulate(1 / 30f);
             Directory.CreateDirectory(Out);
             var views = new (string name, Vector3 pos, Vector3 look)[]
             {
@@ -41,16 +47,157 @@ namespace Aquarium.EditorTools
                 day.mode = mode;
                 day.phase = phase;
                 day.Snap();
+                for (int i = 0; i < 90 && app; i++) app.Simulate(1 / 30f);
                 foreach (var (name, pos, look) in views)
                 {
                     if (name == "close" && preset != "day" && preset != "night") continue;
                     cam.transform.position = pos;
                     cam.transform.LookAt(look);
                     Object.FindFirstObjectByType<GodRays>()?.Face(pos);
-                    Save(cam, $"{Out}/unity-{preset}-{name}.png", 1600, 900);
+                    Shot(cam, app, $"{Out}/unity-{preset}-{name}.png", 1600, 900);
                 }
             }
             Debug.Log("Snapshots rendered");
+        }
+
+        /// <summary>A strip of frames following one fish from the side, to check how it swims.</summary>
+        public static void FishStrip()
+        {
+            EditorSettings.asyncShaderCompilation = false;
+            EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
+            var cam = Camera.main;
+            cam.GetComponent<OrbitCamera>().enabled = false;
+            var app = Object.FindFirstObjectByType<Aquarium.Fish.AquariumApp>();
+            app.Boot(new Aquarium.Life.MemoryWorldStore());
+            UnityEngine.Random.InitState(3);
+            for (int i = 0; i < 300; i++) app.Simulate(1 / 30f);
+            Directory.CreateDirectory("Logs/strip");
+            foreach (var sp in new[] { "goldfish", "neon", "angelfish", "betta" })
+            {
+                var f = app.Eco.fish.Find(x => x.sp.id == sp && !x.hidden);
+                if (f == null) continue;
+                for (int k = 0; k < 12; k++)
+                {
+                    for (int s = 0; s < 2; s++) app.Simulate(1 / 24f);
+                    Object.FindFirstObjectByType<AquariumClock>().Apply(10 + k / 12f);
+                    var p = new Vector3(-f.pos.x, f.pos.y, f.pos.z);
+                    var side = Vector3.Cross(Vector3.up, new Vector3(-f.heading.x, 0, f.heading.z)).normalized;
+                    if (side.z < 0) side = -side;   // look from the front glass side, away from the decor
+                    float d = f.size * 3.2f;
+                    cam.transform.position = p + side * d + Vector3.up * f.size * 0.6f;
+                    cam.transform.LookAt(p);
+                    Shot(cam, app, $"Logs/strip/{sp}-{k:00}.png", 400, 260);
+                }
+            }
+            Debug.Log("Strip rendered");
+        }
+
+        /// <summary>One fish model at rest (no wave, fins still) and paddling, from the side and from above.</summary>
+        public static void FishRest()
+        {
+            EditorSettings.asyncShaderCompilation = false;
+            EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
+            var cam = Camera.main;
+            cam.GetComponent<OrbitCamera>().enabled = false;
+            var set = AssetDatabase.LoadAssetAtPath<Aquarium.Fish.FishModelSet>(FishModelBuilder.SetPath);
+            Directory.CreateDirectory("Logs/rest");
+            var at = new Vector3(0, 3.5f, 2.2f);
+            foreach (var key in new[] { "goldfish", "neon", "angelfish" })
+            {
+                var m = set.Get(key);
+                float len = Aquarium.Fish.FishSpecies.All[key].len;
+                foreach (var (tag, pect) in new[] { ("rest", 0f), ("paddle", 1.2f) })
+                foreach (var (view, offset) in new[] { ("side", new Vector3(-len * 2.5f, 0, 0)), ("top", new Vector3(0, len * 2.5f, 0.001f)) })
+                {
+                    var props = new MaterialPropertyBlock();
+                    props.SetVectorArray("_Wag", new[] { new Vector4(0, 0, 0, len) });
+                    props.SetFloatArray("_Pect", new[] { pect });
+                    props.SetVectorArray("_Tint", new[] { Vector4.one });
+                    var mat = new[] { Matrix4x4.TRS(at, Quaternion.identity, Vector3.one) };
+                    Graphics.RenderMeshInstanced(new RenderParams(m.bodyMaterial) { matProps = props }, m.body, 0, mat, 1);
+                    Graphics.RenderMeshInstanced(new RenderParams(m.finMaterial) { matProps = props }, m.fins, 0, mat, 1);
+                    cam.transform.position = at + offset;
+                    cam.transform.LookAt(at);
+                    Save(cam, $"Logs/rest/{key}-{tag}-{view}.png", 400, 300);
+                }
+            }
+            Debug.Log("Rest rendered");
+        }
+
+        /// <summary>
+        /// Render a shot. The game draws fish, food and bubbles instanced, and such draws last until the
+        /// end of the frame — a tool renders many shots in one frame, so here they are stood in for by
+        /// ordinary renderers that exist only for the shot.
+        /// </summary>
+        static void Shot(Camera cam, Aquarium.Fish.AquariumApp app, string path, int w, int h)
+        {
+            var proxies = app ? Proxies(app) : null;
+            Save(cam, path, w, h);
+            if (proxies) Object.DestroyImmediate(proxies);
+        }
+
+        static GameObject Proxies(Aquarium.Fish.AquariumApp app)
+        {
+            var root = new GameObject("snapshot proxies");
+            void Add(Mesh mesh, Material mat, Vector3 pos, Quaternion rot, Vector3 scale, MaterialPropertyBlock props)
+            {
+                var go = new GameObject("proxy");
+                go.transform.SetParent(root.transform, false);
+                go.transform.SetPositionAndRotation(pos, rot);
+                go.transform.localScale = scale;
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                var r = go.AddComponent<MeshRenderer>();
+                r.sharedMaterial = mat;
+                if (props != null) r.SetPropertyBlock(props);
+            }
+            var eco = app.Eco;
+            app.Draw();   // shader globals (plants pushed aside by the fish)
+            foreach (var f in eco.fish)
+            {
+                if (f.hidden) continue;
+                var m = app.fishModels.Get(f.modelKey);
+                if (m == null) continue;
+                var props = new MaterialPropertyBlock();
+                props.SetVector("_Wag", new Vector4(f.wag.x, -f.wag.y, -f.wag.z, f.wag.w));
+                props.SetFloat("_Pect", f.pect);
+                var t = f.rec.Gene.Tint;
+                props.SetVector("_Tint", new Vector4((float)t[0], (float)t[1], (float)t[2], 1));
+                var pos = new Vector3(-f.pos.x, f.pos.y, f.pos.z);
+                var rot = Aquarium.Fish.FishRenderer.ToUnity(f.rotation);
+                Add(m.body, m.bodyMaterial, pos, rot, f.scaleXYZ, props);
+                Add(m.fins, m.finMaterial, pos, rot, f.scaleXYZ, props);
+            }
+            foreach (var f in eco.food)
+            {
+                var props = new MaterialPropertyBlock();
+                props.SetColor("_BaseColor", f.color);
+                Add(app.foodMesh, app.foodMaterial, new Vector3(-f.pos.x, f.pos.y, f.pos.z), WebSpace.Rot(f.rot.x, f.rot.y, f.rot.z), new Vector3(f.r, f.r * f.stretch, f.r), props);
+            }
+            foreach (var b in eco.bubbles.list)
+                Add(app.bubbleMesh, app.bubbleMaterial, new Vector3(-b.pos.x, b.pos.y, b.pos.z), Quaternion.identity, Vector3.one * b.r, null);
+            return root;
+        }
+
+        /// <summary>Feed a fresh aquarium and report how the fish react (numbers, no pictures).</summary>
+        public static void FeedCheck()
+        {
+            EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
+            var app = Object.FindFirstObjectByType<Aquarium.Fish.AquariumApp>();
+            app.Boot(new Aquarium.Life.MemoryWorldStore());
+            UnityEngine.Random.InitState(5);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            for (int i = 0; i < 300; i++) app.Simulate(1 / 30f);
+            double msPerStep = sw.Elapsed.TotalMilliseconds / 300;
+            app.Eco.Feed(0);
+            int maxEating = 0, dropped = 0;
+            for (int i = 0; i < 30 * 40; i++)
+            {
+                app.Simulate(1 / 30f);
+                maxEating = Mathf.Max(maxEating, app.Eco.fish.Count(f => f.state == Aquarium.Fish.FishState.EAT));
+                dropped = Mathf.Max(dropped, app.Eco.food.Count);
+                if (i == 30 * 10) Debug.Log($"after 10 s: {app.Eco.food.Count} pieces left");
+            }
+            Debug.Log($"FEED CHECK: {app.Eco.fish.Count} fish, simulation {msPerStep:F3} ms/step; up to {maxEating} fish eating at once; food peak {dropped}, left after 40 s: {app.Eco.food.Count} (grounded {app.Eco.food.Count(f => f.grounded)}); stories: {string.Join(" | ", app.Eco.storyLog.Take(8).Select(x => x.text))}");
         }
 
         static void Save(Camera cam, string path, int w, int h)
