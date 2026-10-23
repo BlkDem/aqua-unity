@@ -45,7 +45,7 @@ namespace Aquarium.Fish
         public static bool Chance(float p) => UnityEngine.Random.value < p;
     }
 
-    public sealed class Ecosystem
+    public sealed partial class Ecosystem
     {
         public readonly Aquarium.Life.World world;
         public readonly List<Fish> fish = new List<Fish>();
@@ -70,7 +70,7 @@ namespace Aquarium.Fish
         public Vector3 filterOutlet, cameraPos = new Vector3(0, 3, 14);
         public (bool active, Vector3 point) cursor;
         public (float x, float z, float t)? lastFeed;
-        public Fish moonfish;
+        public PlantSystem plants;
 
         readonly Dictionary<string, float> cool = new Dictionary<string, float>();
         float lastStoryT = -99;
@@ -105,8 +105,12 @@ namespace Aquarium.Fish
                 foreach (var kv in f.rec.Friends)
                     if (int.TryParse(kv.Key, out int uid) && byUid.TryGetValue(uid, out var o)) f.mem.friends[o.id] = (float)kv.Value;
             foreach (var f in fish) f.Init(null);
-            // the rare moonfish only comes out at night
-            foreach (var f in fish) if (f.sp.Rare) { f.hidden = true; moonfish = f; }
+            // rare species start hidden (the moonfish only comes out at night)
+            foreach (var f in fish) if (f.sp.Rare) f.hidden = true;
+            // milestones already reached by the founders are not news
+            foreach (var kv in Lifecycle.SchoolSizes(world, world.Now()))
+                foreach (int m in SchoolMarks) if (kv.Value >= m) world.Mark($"school-{kv.Key}-{m}");
+            lastLife = world.Now();
 
             foreach (var sp in FishSpecies.All.Values)
                 if (sp.school > 0.6f)
@@ -302,25 +306,7 @@ namespace Aquarium.Fish
             bubbles.Update(dt, time);
             if (time > nextDiver) { nextDiver = time + Rnd.R(10, 30); diverSrc.burst = Rnd.R(0.15f, 0.4f); }
 
-            // the moonfish comes out at night and goes back into the cave at dawn
-            if (moonfish != null)
-            {
-                if (moonfish.hidden && night > 0.75f && Rnd.Chance(dt * 0.02f))
-                {
-                    var cave = SpotByName("пещера");
-                    moonfish.hidden = false;
-                    moonfish.pos = cave.pos;
-                    moonfish.SetState(FishState.IDLE);
-                    Tell("moonfish", "Из пещеры выплыла светящаяся Лунная рыбка!", cave.pos, 120, moonfish, true);
-                }
-                else if (!moonfish.hidden && night < 0.3f && moonfish.state != FishState.SCRIPT)
-                {
-                    var cave = SpotByName("пещера");
-                    moonfish.SetState(FishState.SCRIPT, new FishCtx { point = cave.pos, speed = 1.2f, label = "Возвращается в пещеру" }, 20);
-                    var m = moonfish;
-                    After(8, () => m.hidden = true);
-                }
-            }
+            Schedule(dt);
         }
 
         void UpdateSchools(float dt)

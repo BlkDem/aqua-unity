@@ -1,6 +1,7 @@
 // Renders the scene from the same viewpoints and times of day as the web version's reference
 // shots (Docs/reference), into Docs/unity, for side-by-side comparison.
 //   -executeMethod Aquarium.EditorTools.Snapshot.BuildAndRender
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Aquarium.World;
@@ -27,12 +28,12 @@ namespace Aquarium.EditorTools
             EditorSettings.asyncShaderCompilation = false;
             EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
             var cam = Camera.main;
-            var day = Object.FindFirstObjectByType<DayCycle>();
-            var clock = Object.FindFirstObjectByType<AquariumClock>();
+            var day = Object.FindAnyObjectByType<DayCycle>();
+            var clock = Object.FindAnyObjectByType<AquariumClock>();
             cam.GetComponent<OrbitCamera>().enabled = false;
             clock.Apply(12);
             // a fresh aquarium in memory (the real save is not touched), alive for a while
-            var app = Object.FindFirstObjectByType<Aquarium.Fish.AquariumApp>();
+            var app = Object.FindAnyObjectByType<Aquarium.Fish.AquariumApp>();
             app?.Boot(new Aquarium.Life.MemoryWorldStore());
             UnityEngine.Random.InitState(7);
             for (int i = 0; i < 900 && app; i++) app.Simulate(1 / 30f);
@@ -53,7 +54,7 @@ namespace Aquarium.EditorTools
                     if (name == "close" && preset != "day" && preset != "night") continue;
                     cam.transform.position = pos;
                     cam.transform.LookAt(look);
-                    Object.FindFirstObjectByType<GodRays>()?.Face(pos);
+                    Object.FindAnyObjectByType<GodRays>()?.Face(pos);
                     Shot(cam, app, $"{Out}/unity-{preset}-{name}.png", 1600, 900);
                 }
             }
@@ -67,7 +68,7 @@ namespace Aquarium.EditorTools
             EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
             var cam = Camera.main;
             cam.GetComponent<OrbitCamera>().enabled = false;
-            var app = Object.FindFirstObjectByType<Aquarium.Fish.AquariumApp>();
+            var app = Object.FindAnyObjectByType<Aquarium.Fish.AquariumApp>();
             app.Boot(new Aquarium.Life.MemoryWorldStore());
             UnityEngine.Random.InitState(3);
             for (int i = 0; i < 300; i++) app.Simulate(1 / 30f);
@@ -79,7 +80,7 @@ namespace Aquarium.EditorTools
                 for (int k = 0; k < 12; k++)
                 {
                     for (int s = 0; s < 2; s++) app.Simulate(1 / 24f);
-                    Object.FindFirstObjectByType<AquariumClock>().Apply(10 + k / 12f);
+                    Object.FindAnyObjectByType<AquariumClock>().Apply(10 + k / 12f);
                     var p = new Vector3(-f.pos.x, f.pos.y, f.pos.z);
                     var side = Vector3.Cross(Vector3.up, new Vector3(-f.heading.x, 0, f.heading.z)).normalized;
                     if (side.z < 0) side = -side;   // look from the front glass side, away from the decor
@@ -185,7 +186,7 @@ namespace Aquarium.EditorTools
             EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
             var cam = Camera.main;
             cam.GetComponent<OrbitCamera>().enabled = false;
-            var app = Object.FindFirstObjectByType<Aquarium.Fish.AquariumApp>();
+            var app = Object.FindAnyObjectByType<Aquarium.Fish.AquariumApp>();
             app.Boot(new Aquarium.Life.MemoryWorldStore());
             UnityEngine.Random.InitState(4);
             for (int i = 0; i < 600; i++) app.Simulate(1 / 30f);
@@ -214,7 +215,7 @@ namespace Aquarium.EditorTools
         public static void FeedCheck()
         {
             EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
-            var app = Object.FindFirstObjectByType<Aquarium.Fish.AquariumApp>();
+            var app = Object.FindAnyObjectByType<Aquarium.Fish.AquariumApp>();
             app.Boot(new Aquarium.Life.MemoryWorldStore());
             UnityEngine.Random.InitState(5);
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -230,6 +231,39 @@ namespace Aquarium.EditorTools
                 if (i == 30 * 10) Debug.Log($"after 10 s: {app.Eco.food.Count} pieces left");
             }
             Debug.Log($"FEED CHECK: {app.Eco.fish.Count} fish, simulation {msPerStep:F3} ms/step; up to {maxEating} fish eating at once; food peak {dropped}, left after 40 s: {app.Eco.food.Count} (grounded {app.Eco.food.Count(f => f.grounded)}); stories: {string.Join(" | ", app.Eco.storyLog.Take(8).Select(x => x.text))}");
+        }
+
+        /// <summary>
+        /// The world in fast-forward: three days away, then 20 minutes of simulation in which the
+        /// world clock runs 2 hours per second; reports what happened (stories, broods, plants).
+        /// </summary>
+        public static void LifeCheck()
+        {
+            EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
+            var app = Object.FindAnyObjectByType<Aquarium.Fish.AquariumApp>();
+            double clock = 1.7e12;
+            UnityEngine.Random.InitState(7);
+            app.Boot(new Aquarium.Life.MemoryWorldStore(), new Aquarium.Life.WorldOptions { RealNow = () => clock, AwayHours = 72 });
+            var eco = app.Eco;
+            Debug.Log($"LIFE CHECK away: {(app.Away == null ? "none" : Aquarium.Fish.AquariumApp.Describe(app.Away))}; fish {eco.fish.Count}, plants {app.plantRoot.childCount}");
+            var kinds = new Dictionary<string, int>();
+            eco.OnStory += s => kinds[s.kind] = (kinds.TryGetValue(s.kind, out int n) ? n : 0) + 1;
+            int fish0 = eco.fish.Count;
+            const float dt = 1 / 30f;
+            for (int i = 0; i < 30 * 60 * 20; i++)
+            {
+                clock += dt * 2 * 3600 * 1000;
+                app.Simulate(dt);
+                if (i == 30 * 60 * 5)
+                {
+                    eco.ClickProp("chest"); eco.ClickProp("bottle"); eco.ClickProp("crystal"); eco.StartDuck();
+                }
+                if (i == 30 * 60 * 5 + 30 * 3)
+                    Debug.Log($"props: lid {app.layout.chestLid.localEulerAngles}, duck {(app.layout.duck.gameObject.activeSelf ? app.layout.duck.localPosition.ToString() : "hidden")}, crystal flash {eco.crystalFlash:F2}");
+            }
+            Debug.Log($"LIFE CHECK after {(clock - 1.7e12) / 3600e3:F0} world hours: fish {fish0} -> {eco.fish.Count}, plants {app.plantRoot.childCount} (runners {app.World.State.ExtraPlants.Count}), duck {(app.layout.duck.gameObject.activeSelf ? "still out" : "gone")}, secrets [{string.Join(", ", app.World.State.Secrets)}]");
+            Debug.Log("LIFE CHECK stories: " + string.Join(", ", kinds.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} {kv.Value}")));
+            Debug.Log("LIFE CHECK history: " + string.Join(" | ", app.World.State.History.Skip(Mathf.Max(0, app.World.State.History.Count - 12)).Select(h => h.Text)));
         }
 
         static void Save(Camera cam, string path, int w, int h)

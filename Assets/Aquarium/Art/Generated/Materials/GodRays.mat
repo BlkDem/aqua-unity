@@ -25,8 +25,8 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Intensity: 1
+    - _Intensity: 0.915625
     m_Colors:
-    - _Color: {r: 0.78431374, g: 0.96862745, b: 1, a: 1}
+    - _Color: {r: 0.966299, g: 0.9057598, b: 0.9503676, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

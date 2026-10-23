@@ -97,6 +97,8 @@ namespace Aquarium.World
         public Light moon;
         public Light lantern;
         public Light crystal;
+        [Tooltip("0..1: the crystal flares up when found")]
+        public float crystalFlash;
         public Volume volume;
         public Material led, moonLeds, backdrop, room, rays, dust;
         public List<GlowMaterial> glow = new List<GlowMaterial>();
@@ -193,7 +195,7 @@ namespace Aquarium.World
                 g.material.SetColor("_EmissionColor", g.baseEmission * k);
             }
             if (lantern) lantern.intensity = c.night * 2.2f * (0.85f + 0.15f * Mathf.Sin(t * 7.3f) * Mathf.Sin(t * 3.1f)) * invPi;
-            if (crystal) crystal.intensity = (0.3f + c.night * 1.6f) * invPi;
+            if (crystal) crystal.intensity = (0.3f + c.night * 1.6f + crystalFlash * 5.7f) * invPi;
 
             if (volume && volume.sharedProfile && volume.sharedProfile.TryGet(out ColorAdjustments ca))
             {

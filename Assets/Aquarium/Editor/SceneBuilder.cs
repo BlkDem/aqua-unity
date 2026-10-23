@@ -33,7 +33,7 @@ namespace Aquarium.EditorTools
         static float R(float a, float b) => a + R() * (b - a);
         static float Sand(float x, float z) => Terrain.SandHeight(x, z);
 
-        static Transform root, tank, decor, plants;
+        static Transform root, tank, decor, plants, growing;
         static AquariumLayout layout;
         static DayCycle day;
         static readonly List<GameObject> walkables = new List<GameObject>();
@@ -559,13 +559,17 @@ namespace Aquarium.EditorTools
             ["cabomba"] = ("SwayCabomba", 2), ["ludwigia"] = ("SwayLudwigia", 2), ["anubias"] = ("SwayAnubias", 2),
         };
 
+        /// <summary>
+        /// A preview copy of a plant for the editor: at run time the plant system replaces these
+        /// with the saved world's plants (which grow and spread) made from the prefabs below.
+        /// </summary>
         static GameObject Plant(string kind, float x, float z, float scale = 1, float? y = null)
         {
             // planted some days before the aquarium opened: grown to 73..92% of their size
             float gene = R(0.85f, 1.15f), age = R(3, 9), growth = 0.5f + 0.5f * (1 - Mathf.Exp(-age / 5));
             int variant = (int)R(0, 9);
             var (node, variants) = PlantNode[kind];
-            var go = Node(kind, $"{node}{variant % variants}", plants);
+            var go = Node(kind, $"{node}{variant % variants}", growing);
             go.transform.localPosition = P(x, y ?? Sand(x, z) - 0.03f, z);
             go.transform.localRotation = Yaw(R(0, Mathf.PI * 2));
             go.transform.localScale = Vector3.one * scale * gene * growth;
@@ -575,8 +579,35 @@ namespace Aquarium.EditorTools
         static void Clump(string name, float x, float z, float radius) =>
             layout.clumps.Add(new Spot { name = name, position = P(x, Sand(x, z) + 0.6f, z), kind = "plants", radius = radius });
 
+        const string PlantDir = "Assets/Aquarium/Art/Generated/Plants";
+        static Aquarium.Fish.PlantModelSet plantSet;
+
+        /// <summary>Prefabs of every variant of the plants that grow (the plant system places them).</summary>
+        static Aquarium.Fish.PlantModelSet BuildPlantModels()
+        {
+            Directory.CreateDirectory(PlantDir);
+            string setPath = $"{PlantDir}/PlantModels.asset";
+            var set = AssetDatabase.LoadAssetAtPath<Aquarium.Fish.PlantModelSet>(setPath);
+            if (!set) { set = ScriptableObject.CreateInstance<Aquarium.Fish.PlantModelSet>(); AssetDatabase.CreateAsset(set, setPath); }
+            set.plants.Clear();
+            foreach (var kv in PlantNode)
+                for (int v = 0; v < kv.Value.variants; v++)
+                {
+                    string node = $"{kv.Value.node}{v}";
+                    var go = Node(kv.Key, node, null);
+                    var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{PlantDir}/{node}.prefab");
+                    UnityEngine.Object.DestroyImmediate(go);
+                    set.plants.Add(new Aquarium.Fish.PlantModelSet.Entry { node = node, prefab = prefab });
+                }
+            EditorUtility.SetDirty(set);
+            return set;
+        }
+
         static void BuildPlants()
         {
+            growing = new GameObject("Growing").transform;
+            growing.SetParent(plants, false);
+            plantSet = BuildPlantModels();
             foreach (var (x, z) in new[] { (-5.3f, -2.0f), (-5.6f, -0.6f), (-2.6f, -2.05f), (-1.6f, -1.9f), (1.2f, -2.15f), (5.55f, -2.15f), (-0.4f, -2.1f), (3.5f, -2.15f) }) { Plant("vallisneria", x, z); Clump("заросли валлиснерии", x, z + 0.3f, 0.6f); }
             foreach (var (x, z) in new[] { (-2.95f, 0.4f), (-4.4f, 0.45f), (-0.5f, 0.95f), (5.0f, 0.35f) }) { Plant("sword", x, z, 0.95f); Clump("куст эхинодоруса", x, z, 0.7f); }
             foreach (var (x, z) in new[] { (-3.5f, 1.0f), (2.6f, 1.15f), (-1.9f, 1.35f), (4.4f, 1.6f) }) { Plant("crypt", x, z, 1.1f); Clump("криптокорина", x, z, 0.4f); }
@@ -596,6 +627,8 @@ namespace Aquarium.EditorTools
                 f.SetParent(plants, false);
                 f.localPosition = P(x, Terrain.WaterY - 0.03f, z);
                 f.localRotation = Yaw(R(0, Mathf.PI * 2));
+                var drift = f.gameObject.AddComponent<Floater>();
+                drift.x = x; drift.z = z; drift.phase = R(0, Mathf.PI * 2);
                 f.localScale = Vector3.one * R(0.9f, 1.3f);
                 Node("pistia", $"SwayPistia{i}", f);
                 Node("pistia", $"RootsPistia{i}", f);
@@ -816,6 +849,8 @@ namespace Aquarium.EditorTools
             var app = go.AddComponent<Aquarium.Fish.AquariumApp>();
             app.fishModels = FishModelBuilder.Build();
             app.critterModels = CritterModelBuilder.Build();
+            app.plantModels = plantSet;
+            app.plantRoot = growing;
             app.layout = layout;
             app.day = day;
             app.foodMesh = SaveMesh(MeshGen.Cylinder(1, 1, 0.35f, 7, "Food"));

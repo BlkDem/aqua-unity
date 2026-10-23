@@ -146,7 +146,7 @@ namespace Aquarium.Fish
             StartHop(eco.SurfacePoint(pos.x + a.x * Rnd.R(0.6f, 1.4f), pos.z + a.z * Rnd.R(0.4f, 1.0f)), 0.5f);
         }
 
-        void StartHop(Vector3 to, float h = 0.4f)
+        public void StartHop(Vector3 to, float h = 0.4f)
         {
             hop = (pos, to, 0, 0.6f + Vector3.Distance(pos, to) * 0.5f, h);
             state = S.HOP;
@@ -263,9 +263,10 @@ namespace Aquarium.Fish
         static readonly Color[] ShellTints = { new Color(1, 1, 1), new Color(0.78f, 0.6f, 0.45f), new Color(1.04f, 1.02f, 0.9f), new Color(0.85f, 0.95f, 0.78f) };
 
         public readonly string type;
-        string mode = "ground", pane;
+        public string mode = "ground";
+        string pane;
         float u, v, ang, retract, t, crawl, pause;
-        bool reachedTop, goalTop;
+        public bool reachedTop, goalTop;
         Vector3 heading = Vector3.right, normal = Vector3.up;
         Vector3? goal;
         FoodItem food;
@@ -516,7 +517,7 @@ namespace Aquarium.Fish
                 if (Rnd.Chance(0.15f)) wave = 2.5f;
             }
             float speed = 0;
-            if (!(idle > 0))
+            if (!(idle > 0) && goal.HasValue)   // (someone else may have eaten the food it was going for)
             {
                 var a = goal.Value - pos; a.y = 0;
                 float d = a.magnitude; a.Normalize();

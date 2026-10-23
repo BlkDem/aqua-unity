@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 008b08b3aba71134890cffb659e6d198, type: 3}
+  m_Name: PlantModels
+  m_EditorClassIdentifier: Aquarium.Fish::Aquarium.Fish.PlantModelSet
+  plants:
+  - node: SwayVallis0
+    prefab: {fileID: 6816297240119649235, guid: 6b59ca860801fe249b3173d8b57638fc, type: 3}
+  - node: SwayVallis1
+    prefab: {fileID: 7469398409497790440, guid: e1236cab2e094074c88bc5089e195be3, type: 3}
+  - node: SwayVallis2
+    prefab: {fileID: 3029292410341351794, guid: ad70ae841b978334494d48d0d70e785f, type: 3}
+  - node: SwaySword0
+    prefab: {fileID: 8924964380775537787, guid: d08d1639e9727d04cbddd31345cdbcf6, type: 3}
+  - node: SwaySword1
+    prefab: {fileID: 5052684345395421304, guid: 86e1801781adb2849a2c5a8f7cea1c16, type: 3}
+  - node: SwayCrypt0
+    prefab: {fileID: 1535651000013921788, guid: b56bc3790857a834d9d75c7490f9b163, type: 3}
+  - node: SwayCrypt1
+    prefab: {fileID: 8195023595912626205, guid: 6e2d41178cbdc4e44993c3ca5be1f75a, type: 3}
+  - node: SwayLimno0
+    prefab: {fileID: 8096349506756039318, guid: 6f56de2c1da1ad04ebd485a2217024a4, type: 3}
+  - node: SwayLimno1
+    prefab: {fileID: 2966557145525537134, guid: 8d89391c0faf05e4fb2622a96736974c, type: 3}
+  - node: SwayCabomba0
+    prefab: {fileID: 4330855748999586762, guid: d3a210c88e5d6434c8d670602c2624fc, type: 3}
+  - node: SwayCabomba1
+    prefab: {fileID: 1698691239657598150, guid: 0a6f914a5f3f0e743bc931082581717e, type: 3}
+  - node: SwayLudwigia0
+    prefab: {fileID: 7591318432603374102, guid: 023e17352ac688b47b548e68b83f01d1, type: 3}
+  - node: SwayLudwigia1
+    prefab: {fileID: 3310504204387971601, guid: e04fddc13bc095441bdc1668ad688042, type: 3}
+  - node: SwayAnubias0
+    prefab: {fileID: 8981856037751694151, guid: 3eefb5c47205a404aaa883dbb1884cf1, type: 3}
+  - node: SwayAnubias1
+    prefab: {fileID: 8164468687170488892, guid: fa5a5bf3d85494742ad9b7bb210043bd, type: 3}

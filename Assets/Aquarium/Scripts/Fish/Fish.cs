@@ -183,7 +183,7 @@ namespace Aquarium.Fish
             SetState(stage == Stage.Fry ? FishState.NURSERY : sp.school > 0.6f ? FishState.SCHOOL : FishState.IDLE);
         }
 
-        float Dist(Fish o) => Vector3.Distance(pos, o.pos);
+        public float Dist(Fish o) => Vector3.Distance(pos, o.pos);
 
         public void SetState(FishState s, FishCtx c = null, float? dur = null)
         {
@@ -317,7 +317,7 @@ namespace Aquarium.Fish
             if (who != null) Remember(who, "испугался", -0.05f);
         }
 
-        void StartStandoff(Fish o)
+        public void StartStandoff(Fish o)
         {
             float dur = Rnd.R(3, 5.5f);
             SetState(FishState.STANDOFF, new FishCtx { rival = o }, dur);
@@ -383,7 +383,7 @@ namespace Aquarium.Fish
             Enter(Weighted(w), friend);
         }
 
-        void Enter(FishState next, Fish friend = null)
+        public void Enter(FishState next, Fish friend = null)
         {
             switch (next)
             {
@@ -489,6 +489,8 @@ namespace Aquarium.Fish
             }
             return best;
         }
+
+        public Vector3 RandomZonePoint() => new Vector3(Rnd.R(-BoundsX, BoundsX) * 0.9f, Rnd.R(sp.zoneMin + 0.3f, sp.zoneMax), Rnd.R(BoundsZMin, BoundsZMax) * 0.9f);
 
         public Vector3 RandomPointNear(Vector3 c, float r) => new Vector3(
             Mathf.Clamp(c.x + Rnd.R(-r, r), -BoundsX, BoundsX),
