@@ -12,8 +12,8 @@ PlayerSettings:
   targetDevice: 2
   useOnDemandResources: 0
   accelerometerFrequency: 60
-  companyName: DefaultCompany
-  productName: My project
+  companyName: umolab
+  productName: "\u0416\u0438\u0432\u043E\u0439 \u0430\u043A\u0432\u0430\u0440\u0438\u0443\u043C"
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
   m_SplashScreenBackgroundColor: {r: 0.13725491, g: 0.12156863, b: 0.1254902, a: 1}
@@ -170,8 +170,8 @@ PlayerSettings:
   androidMaxAspectRatio: 2.4
   androidMinAspectRatio: 1
   applicationIdentifier:
-    Android: com.UnityTechnologies.com.unity.template.urpblank
-    Standalone: com.Unity-Technologies.com.unity.template.urp-blank
+    Android: ru.umolab.aquarium
+    Standalone: ru.umolab.aquarium
     iPhone: com.Unity-Technologies.com.unity.template.urp-blank
     tvOS: com.Unity-Technologies.com.unity.template.urp-blank
   buildNumber:

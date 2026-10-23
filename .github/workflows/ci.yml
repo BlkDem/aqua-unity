@@ -1,0 +1,54 @@
+# Tests on every push; a Windows build on main. Uses GameCI (https://game.ci).
+# Secrets: UNITY_EMAIL, UNITY_PASSWORD, UNITY_LICENSE (see README).
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: true
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: Library-
+      - uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          testMode: editmode
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows:
+    if: github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: true
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-Win-${{ hashFiles('Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: Library-
+      - uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: StandaloneWindows64
+          buildName: Aquarium
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Aquarium-Windows
+          path: build/StandaloneWindows64

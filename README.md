@@ -1,0 +1,54 @@
+# Живой аквариум — Unity
+
+Перенос «Живого аквариума» (веб-версия: репозиторий `aqua`, https://aqua.umolab.ru) на Unity. План работ — [PLAN.md](PLAN.md).
+
+## Что нужно
+
+- Unity **6000.6.7f1** (Unity 6.6) с модулями Windows Build Support (IL2CPP) и Web
+- Unity Hub с выполненным входом (лицензия Personal)
+- Git с Git LFS. Модели, текстуры и звуки лежат в LFS (см. `.gitattributes`). Под WSL у git нет LFS: работать с репозиторием из Windows (PowerShell, Git Bash, VS Code)
+- VS Code с расширением Unity (оно подтянет C# и C# Dev Kit) и .NET 8 SDK. В Unity: Edit → Preferences → External Tools → External Script Editor → Visual Studio Code
+
+## Структура
+
+```
+Assets/Aquarium/
+  Scenes/            Aquarium.unity — основная сцена
+  Scripts/Life/      живой мир: время, рост, пары, мальки, наследование, история, склонения.
+                     Чистый C# без UnityEngine (noEngineReferences) — тестируется и переносится отдельно
+  Tests/EditMode/    тесты NUnit
+Assets/Settings/     URP: профили качества PC/Mobile, Volume
+```
+
+Новые слои появляются по мере работ: `World` (аквариум, декор, растения, день и ночь), `Fish`, `Critters`, `FX` (шейдеры, частицы, камера, звук), `UI`. У каждого свой assembly definition; `Life` ни от кого из них не зависит.
+
+## Эталон
+
+`Docs/reference/` — снимки веб-версии (утро, день, вечер, ночь; общий план и крупный), по ним сверяем картинку в Unity на этапе 2. Сняты в браузере с программным рендером, поэтому сглаживание и шум чуть грубее, чем на видеокарте; цвет, свет и композиция — как есть.
+
+## Тесты
+
+В редакторе: Window → General → Test Runner → EditMode → Run All.
+
+Из командной строки (Unity Hub должен быть запущен — из него берётся лицензия):
+
+```powershell
+& "C:\Program Files\Unity\Hub\Editor\6000.6.7f1\Editor\Unity.exe" -batchmode `
+  -projectPath C:\Users\maxim\projects\aqua-unity -runTests -testPlatform EditMode `
+  -testResults Logs\editmode.xml -logFile Logs\batch.log
+```
+
+Код выхода 0 — все тесты прошли; подробности в `Logs/editmode.xml`.
+
+## CI
+
+`.github/workflows/ci.yml` (GameCI): на каждый пуш — EditMode-тесты, в `main` — ещё и сборка под Windows (артефакт `Aquarium-Windows`). Нужны секреты репозитория:
+
+- `UNITY_EMAIL`, `UNITY_PASSWORD` — учётная запись Unity
+- `UNITY_LICENSE` — содержимое файла лицензии Personal (`.ulf`); как его получить — https://game.ci/docs/github/activation
+
+## Соглашения
+
+- Логика живого мира — только в `Scripts/Life` и только на C#, без Unity API; формат сохранения совпадает с веб-версией (мир v2), чтобы аквариум можно было перенести.
+- Строки интерфейса — по-русски; склонения через `Words`.
+- Коммиты — небольшими шагами, по этапам плана.
