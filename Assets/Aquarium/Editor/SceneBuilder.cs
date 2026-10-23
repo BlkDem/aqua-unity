@@ -815,6 +815,7 @@ namespace Aquarium.EditorTools
             go.transform.SetParent(root, false);
             var app = go.AddComponent<Aquarium.Fish.AquariumApp>();
             app.fishModels = FishModelBuilder.Build();
+            app.critterModels = CritterModelBuilder.Build();
             app.layout = layout;
             app.day = day;
             app.foodMesh = SaveMesh(MeshGen.Cylinder(1, 1, 0.35f, 7, "Food"));

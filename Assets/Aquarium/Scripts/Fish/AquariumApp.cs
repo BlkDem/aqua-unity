@@ -14,6 +14,7 @@ namespace Aquarium.Fish
     public sealed class AquariumApp : MonoBehaviour
     {
         public FishModelSet fishModels;
+        public CritterModelSet critterModels;
         public AquariumLayout layout;
         public DayCycle day;
         public Mesh foodMesh, bubbleMesh;
@@ -40,6 +41,9 @@ namespace Aquarium.Fish
             foreach (var f in Eco.fish) fishRenderer.Add(f);
             Eco.OnFish += fishRenderer.Add;
             foodRenderer = new FoodRenderer(foodMesh, foodMaterial);
+            var critterRoot = transform.Find("Critters") ?? new GameObject("Critters").transform;
+            critterRoot.SetParent(transform, false);
+            Eco.critters.AddRange(CritterFactory.Build(Eco, critterModels, critterRoot));
             Eco.OnStory += s => Debug.Log($"[история] {s.text}");
         }
 

@@ -178,6 +178,38 @@ namespace Aquarium.EditorTools
             return root;
         }
 
+        /// <summary>Frames following each kind of critter, from the front glass side.</summary>
+        public static void CritterStrip()
+        {
+            EditorSettings.asyncShaderCompilation = false;
+            EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
+            var cam = Camera.main;
+            cam.GetComponent<OrbitCamera>().enabled = false;
+            var app = Object.FindFirstObjectByType<Aquarium.Fish.AquariumApp>();
+            app.Boot(new Aquarium.Life.MemoryWorldStore());
+            UnityEngine.Random.InitState(4);
+            for (int i = 0; i < 600; i++) app.Simulate(1 / 30f);
+            app.Eco.Feed(0);
+            for (int i = 0; i < 450; i++) app.Simulate(1 / 30f);
+            Directory.CreateDirectory("Logs/critters");
+            var picks = new[] { ("crab", "crab"), ("shrimp", "shrimp"), ("snail", "mystery"), ("snail", "nerite"), ("snail", "ramshorn") };
+            foreach (var (kind, type) in picks)
+            {
+                var c = app.Eco.critters.Find(x => x.kind == kind && (kind != "snail" || ((Aquarium.Fish.Snail)x).type == type));
+                if (c == null) continue;
+                for (int k = 0; k < 6; k++)
+                {
+                    for (int s = 0; s < 10; s++) app.Simulate(1 / 30f);
+                    var p = c.root.position;
+                    float d = kind == "crab" ? 0.9f : 0.55f;
+                    cam.transform.position = p + new Vector3(0.15f, 0.25f, d);
+                    cam.transform.LookAt(p + Vector3.up * 0.05f);
+                    Shot(cam, app, $"Logs/critters/{type}-{k}.png", 400, 300);
+                }
+            }
+            Debug.Log("Critter strip rendered");
+        }
+
         /// <summary>Feed a fresh aquarium and report how the fish react (numbers, no pictures).</summary>
         public static void FeedCheck()
         {

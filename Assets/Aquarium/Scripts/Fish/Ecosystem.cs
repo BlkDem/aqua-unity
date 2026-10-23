@@ -23,7 +23,8 @@ namespace Aquarium.Fish
     {
         public string kind, text;
         public Vector3? pos;
-        public Fish focus;
+        /// <summary>Who it is about: a Fish or a Critter (the camera can follow it).</summary>
+        public object focus;
         public bool rare;
         public float t;
     }
@@ -49,6 +50,7 @@ namespace Aquarium.Fish
         public readonly Aquarium.Life.World world;
         public readonly List<Fish> fish = new List<Fish>();
         public readonly List<FoodItem> food = new List<FoodItem>();
+        public readonly List<Critter> critters = new List<Critter>();
         public readonly List<Place> spots = new List<Place>();
         public readonly List<Place> clumps = new List<Place>();
         public readonly List<Obstacle> colliders = new List<Obstacle>();
@@ -83,6 +85,7 @@ namespace Aquarium.Fish
         {
             this.world = world;
             this.layout = layout;
+            BuildHeightGrid();
             foreach (var s in layout.spots) spots.Add(new Place { name = s.name, kind = s.kind, pos = Web(s.position), radius = s.radius });
             foreach (var c in layout.clumps) clumps.Add(new Place { name = c.name, kind = "plants", pos = Web(c.position), radius = c.radius });
             spots.AddRange(clumps);
@@ -122,11 +125,73 @@ namespace Aquarium.Fish
         }
 
         public float HeightAt(float x, float z) => Terrain.SandHeight(x, z);
-        /// <summary>Whatever is underfoot at web (x, z): sand or the top of the decor (food settles there).</summary>
-        public float SurfaceAt(float x, float z) => layout ? layout.SurfaceAt(-x, z) : HeightAt(x, z);
+        // ----------------------------------------------------------- surfaces critters walk on
+        // a grid over the tank floor: the sand, or the top of the decor where there is some
+        float[] grid;
+        int gnx, gnz;
+        const float GridStep = 0.1f;
+        float gx0, gz0;
+
+        void BuildHeightGrid()
+        {
+            gx0 = -(Terrain.W - 0.3f) / 2; gz0 = -(Terrain.D - 0.3f) / 2;
+            gnx = Mathf.CeilToInt((Terrain.W - 0.3f) / GridStep) + 1;
+            gnz = Mathf.CeilToInt((Terrain.D - 0.3f) / GridStep) + 1;
+            grid = new float[gnx * gnz];
+            Physics.SyncTransforms();
+            for (int j = 0; j < gnz; j++)
+            for (int i = 0; i < gnx; i++)
+            {
+                float x = gx0 + i * GridStep, z = gz0 + j * GridStep, y = Terrain.SandHeight(x, z);
+                if (Physics.Raycast(new Vector3(-x, 7, z), Vector3.down, out var hit, 7, layout ? (int)layout.walkable : ~0, QueryTriggerInteraction.Ignore)
+                    && hit.point.y > y && hit.point.y < 5.3f) y = hit.point.y;
+                grid[j * gnx + i] = y;
+            }
+        }
+
+        /// <summary>Whatever is underfoot at (x, z): sand or the top of the decor (critters walk there, food settles there).</summary>
+        public float SurfaceAt(float x, float z)
+        {
+            if (grid == null) return HeightAt(x, z);
+            float fx = Mathf.Clamp((x - gx0) / GridStep, 0, gnx - 1.001f), fz = Mathf.Clamp((z - gz0) / GridStep, 0, gnz - 1.001f);
+            int i = (int)fx, j = (int)fz;
+            float u = fx - i, v = fz - j;
+            float a = grid[j * gnx + i], b = grid[j * gnx + i + 1], c = grid[(j + 1) * gnx + i], d = grid[(j + 1) * gnx + i + 1];
+            return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+        }
+
+        public Vector3 SurfaceNormal(float x, float z)
+        {
+            const float e = 0.08f;
+            var n = new Vector3(-(SurfaceAt(x + e, z) - SurfaceAt(x - e, z)), 2 * e, -(SurfaceAt(x, z + e) - SurfaceAt(x, z - e))).normalized;
+            // limit the tilt so walkers don't look glued on sideways
+            if (n.y < 0.45f) { n.y = 0.45f; n.Normalize(); }
+            return n;
+        }
+
+        public Vector3 SurfacePoint(float x, float z)
+        {
+            x = Mathf.Clamp(x, -5.7f, 5.7f); z = Mathf.Clamp(z, -2.2f, 2.2f);
+            return new Vector3(x, SurfaceAt(x, z), z);
+        }
+
+        public Vector3 RandomSurfacePoint(bool groundOnly, Vector3? near = null, float radius = 2)
+        {
+            for (int k = 0; k < 30; k++)
+            {
+                float x, z;
+                if (near.HasValue) { x = near.Value.x + Rnd.R(-radius, radius); z = near.Value.z + Rnd.R(-radius, radius) * 0.6f; }
+                else { x = Rnd.R(-5.6f, 5.6f); z = Rnd.R(-2.1f, 2.1f); }
+                x = Mathf.Clamp(x, -5.7f, 5.7f); z = Mathf.Clamp(z, -2.2f, 2.2f);
+                float y = SurfaceAt(x, z);
+                if (groundOnly && y > HeightAt(x, z) + 0.05f) continue;
+                return new Vector3(x, y, z);
+            }
+            return SurfacePoint(near?.x ?? 0, near?.z ?? 1.5f);
+        }
         public Place SpotByName(string n) => spots.Find(s => s.name == n);
 
-        public bool Tell(string kind, string text, Vector3? pos = null, float cooldown = 15, Fish focus = null, bool rare = false)
+        public bool Tell(string kind, string text, Vector3? pos = null, float cooldown = 15, object focus = null, bool rare = false)
         {
             if (cool.TryGetValue(kind, out var until) && time < until) return false;
             if (!rare && time - lastStoryT < 4.5f) return false;
@@ -187,6 +252,43 @@ namespace Aquarium.Fish
             if (eater.mem.meals == 1 && eater.p("gluttony") > 0.8f && Rnd.Chance(0.4f)) Tell("first", $"{eater.name}, как всегда, первым у корма", f.pos, 40, eater);
         }
 
+        public void EatFood(FoodItem f, Critter eater)
+        {
+            if (f.eaten) return;
+            f.eaten = true;
+            if (Rnd.Chance(0.4f)) Tell("critter-eat", $"{eater.title} {eater.name} подобрал{(eater.kind == "snail" ? "а" : "")} кусочек корма со дна", f.pos, 40, eater);
+        }
+
+        /// <summary>A knock on the glass at point: most fish dart away (and come back later), the bold ones come to look.</summary>
+        public void Tap(Vector3 point)
+        {
+            int scared = 0;
+            var curious = new List<Fish>();
+            foreach (var f in fish)
+            {
+                if (f.hidden) continue;
+                float d = Vector3.Distance(f.pos, point);
+                if (d > 2.6f) continue;
+                if (f.p("curiosity") > 0.65f && f.p("bravery") > 0.55f && Rnd.Chance(0.5f))
+                {
+                    curious.Add(f);
+                    var ff = f;
+                    After(Rnd.R(0.8f, 2.2f), () => ff.SetState(FishState.CURIOUS, new FishCtx { point = point }, Rnd.R(4, 8)));
+                    f.Flee(point, 0.4f);
+                }
+                else
+                {
+                    f.Flee(point, 0.6f + (2.6f - d) * 0.6f * (0.5f + f.p("shyness")));
+                    scared++;
+                    var ff = f;
+                    After(Rnd.R(3, 7), () => { if (ff.state != FishState.EAT) ff.SetState(ff.sp.school > 0.6f ? FishState.SCHOOL : FishState.RETURN); });
+                }
+            }
+            foreach (var c in critters) if (Vector3.Distance(c.pos, point) < 1.8f) c.Scare(point);
+            if (curious.Count > 0 && Rnd.Chance(0.6f)) Tell("tap-curious", $"{curious[0].name} не испугался и подплыл посмотреть, кто стучит", point, 20, curious[0]);
+            else if (scared > 3) Tell("tap", Rnd.Pick(new[] { "Тук-тук! Рыбки бросились врассыпную", "Стук по стеклу напугал рыбок", "Ой! Все разбежались" }), point, 15);
+        }
+
         // ----------------------------------------------------------- frame
         public void Update(float dt)
         {
@@ -195,6 +297,7 @@ namespace Aquarium.Fish
                 if (time >= timers[i].t) { var fn = timers[i].fn; timers.RemoveAt(i); fn(); }
             UpdateSchools(dt);
             foreach (var f in fish) f.Update(dt);
+            foreach (var c in critters) c.Update(dt);
             FoodItem.Update(food, dt, this);
             bubbles.Update(dt, time);
             if (time > nextDiver) { nextDiver = time + Rnd.R(10, 30); diverSrc.burst = Rnd.R(0.15f, 0.4f); }
