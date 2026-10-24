@@ -17,7 +17,7 @@ namespace Aquarium.World
         public float maxPolar = Mathf.PI * 0.62f;
         public float rotateSpeed = 0.25f, damping = 8;
         [Tooltip("How much nearer one notch of the wheel brings the camera (the Input System gives about 1 per notch on every platform)")]
-        public float zoomPerNotch = 0.15f;
+        public float zoomPerNotch = 0.05f;
         /// <summary>True while the pointer is over the interface: drags and the wheel are not the camera's then.</summary>
         public Func<bool> inputBlocked;
 
