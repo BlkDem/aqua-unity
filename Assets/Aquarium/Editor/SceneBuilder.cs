@@ -15,6 +15,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.UIElements;
 using static Aquarium.World.WebSpace;
 using Terrain = Aquarium.World.Terrain;
 using Random = System.Random;
@@ -83,6 +84,7 @@ namespace Aquarium.EditorTools
             BuildCameraAndPost();
             BakeEnvironment();
             BuildApp();
+            BuildShell(root.GetComponentInChildren<Camera>(), day.volume);
             day.mode = DayCycle.Mode.Day;
             day.Snap();
         }
@@ -369,6 +371,7 @@ namespace Aquarium.EditorTools
                 layout.chestPosition = P(cx, Sand(cx, cz) + 0.35f, cz);
 
                 Place("bottle", decor, new Vector3(-1.55f, Sand(-1.55f, 1.45f) + 0.05f, 1.45f), new Vector3(Mathf.PI / 2 - 0.1f, 0, 0.7f));
+                layout.bottlePosition = P(-1.55f, Sand(-1.55f, 1.45f) + 0.1f, 1.45f);
                 Spot("бутылка", -1.55f, Sand(-1.55f, 1.45f) + 0.4f, 1.45f, "landmark", 0.3f);
             }
             // stone arch and the cave behind it, with its glowing crystals
@@ -885,6 +888,9 @@ namespace Aquarium.EditorTools
             var bloom = profile.Add<Bloom>(true); bloom.intensity.value = 0.5f; bloom.threshold.value = 0.95f; bloom.scatter.value = 0.65f;
             var ca = profile.Add<ColorAdjustments>(true); ca.postExposure.value = 0;
             var vig = profile.Add<Vignette>(true); vig.intensity.value = 0.22f; vig.smoothness.value = 0.45f;
+            // depth of field for the observe and cinematic modes (the director turns it on and focuses)
+            var dof = profile.Add<DepthOfField>(true); dof.mode.value = DepthOfFieldMode.Bokeh; dof.focalLength.value = 50; dof.aperture.value = 14; dof.focusDistance.value = 10;
+            dof.active = false;
             foreach (var c in profile.components) AssetDatabase.AddObjectToAsset(c, profile);
             EditorUtility.SetDirty(profile);
             var volGo = new GameObject("Post");
@@ -893,6 +899,39 @@ namespace Aquarium.EditorTools
             vol.isGlobal = true;
             vol.sharedProfile = profile;
             day.volume = vol;
+        }
+
+        /// <summary>The interface, the sound and the input around the aquarium (Aquarium.App).</summary>
+        static void BuildShell(Camera cam, Volume vol)
+        {
+            const string uiDir = "Assets/Aquarium/UI";
+            string panelPath = $"{uiDir}/AquariumPanel.asset";
+            var panel = AssetDatabase.LoadAssetAtPath<PanelSettings>(panelPath);
+            if (!panel) { panel = ScriptableObject.CreateInstance<PanelSettings>(); AssetDatabase.CreateAsset(panel, panelPath); }
+            panel.themeStyleSheet = AssetDatabase.LoadAssetAtPath<ThemeStyleSheet>($"{uiDir}/AquariumTheme.tss");
+            // sizes are CSS pixels, as in a browser: one pixel at 96 dpi, more on dense screens
+            panel.scaleMode = PanelScaleMode.ConstantPhysicalSize;
+            panel.referenceDpi = 96;
+            panel.fallbackDpi = 96;
+            panel.clearColor = false;
+            EditorUtility.SetDirty(panel);
+
+            var go = new GameObject("Shell");
+            go.transform.SetParent(root, false);
+            var doc = go.AddComponent<UIDocument>();
+            doc.panelSettings = panel;
+            var src = go.AddComponent<AudioSource>();
+            src.playOnAwake = false;
+            var audio = go.AddComponent<Aquarium.App.AquaAudio>();
+            var shell = go.AddComponent<Aquarium.App.AquariumShell>();
+            shell.app = root.GetComponentInChildren<Aquarium.Fish.AquariumApp>();
+            shell.day = day;
+            shell.cam = cam;
+            shell.orbit = cam.GetComponent<OrbitCamera>();
+            shell.volume = vol;
+            shell.audio = audio;
+            shell.document = doc;
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
         }
     }
 }

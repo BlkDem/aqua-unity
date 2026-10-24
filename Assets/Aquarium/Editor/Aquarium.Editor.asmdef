@@ -6,7 +6,8 @@
         "Aquarium.World",
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.RenderPipelines.Core.Runtime",
-        "Aquarium.Fish"
+        "Aquarium.Fish",
+        "Aquarium.App"
     ],
     "includePlatforms": [
         "Editor"

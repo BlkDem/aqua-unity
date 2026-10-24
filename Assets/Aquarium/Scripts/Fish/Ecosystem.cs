@@ -353,6 +353,12 @@ namespace Aquarium.Fish
             }
         }
 
+        public void Rename(Fish f, string name)
+        {
+            f.rec.Name = name;
+            Save();
+        }
+
         public void Save()
         {
             foreach (var f in fish)

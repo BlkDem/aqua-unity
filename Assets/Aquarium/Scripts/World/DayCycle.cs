@@ -99,6 +99,8 @@ namespace Aquarium.World
         public Light crystal;
         [Tooltip("0..1: the crystal flares up when found")]
         public float crystalFlash;
+        [Tooltip("0..1: the camera is under water, the picture takes a blue-green cast")]
+        public float underwater;
         public Volume volume;
         public Material led, moonLeds, backdrop, room, rays, dust;
         public List<GlowMaterial> glow = new List<GlowMaterial>();
@@ -202,6 +204,8 @@ namespace Aquarium.World
                 // three.js's ACES fit scales by exposure / 0.6 before the curve
                 ca.postExposure.overrideState = true;
                 ca.postExposure.value = Mathf.Log(c.exposure * exposureMul / 0.6f, 2) + ExposureBias;
+                ca.colorFilter.overrideState = true;
+                ca.colorFilter.value = Color.Lerp(Color.white, new Color(0.75f, 0.95f, 1.08f), underwater * 0.5f);
             }
         }
 

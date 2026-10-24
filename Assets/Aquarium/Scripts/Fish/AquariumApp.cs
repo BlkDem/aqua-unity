@@ -1,5 +1,5 @@
 // Brings the aquarium to life in the scene: loads the saved world (the same save as the web
-// version), lets its fish swim, feeds them (F), saves now and then and when the app closes.
+// version), lets its fish swim, saves now and then and when the app closes.
 //   command line: -timescale 600 (one real second = ten world minutes), -away 48 (pretend the
 //   last visit was 48 hours ago); both keep their own save.
 using System;
@@ -7,7 +7,6 @@ using System.IO;
 using Aquarium.Life;
 using Aquarium.World;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace Aquarium.Fish
 {
@@ -33,14 +32,18 @@ namespace Aquarium.Fish
         static readonly int FishId = Shader.PropertyToID("_AqFish");
         float saveT = 20;
 
+        /// <summary>For tests and tools: a world of their own instead of the real save.</summary>
+        public static IWorldStore storeOverride;
+        public static WorldOptions optionsOverride;
+
         void Start() => Boot();
 
         /// <summary>Set things up (also called by tools in the editor, with a store of their own).</summary>
         public void Boot(IWorldStore store = null, WorldOptions options = null)
         {
             if (Eco != null) return;
-            store ??= new FileWorldStore(Path.Combine(Application.persistentDataPath, "world"));
-            World = new Aquarium.Life.World(store, options ?? Options());
+            store ??= storeOverride ?? new FileWorldStore(Path.Combine(Application.persistentDataPath, "world"));
+            World = new Aquarium.Life.World(store, options ?? optionsOverride ?? Options());
             // first the world catches up with the time it was closed, then it comes to life
             Away = Lifecycle.CatchUp(World, World.Now());
             Eco = new Ecosystem(World, layout);
@@ -96,7 +99,6 @@ namespace Aquarium.Fish
         void Update()
         {
             if (Eco == null) return;
-            if (Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame) Eco.Feed();
             Step(Mathf.Min(Time.deltaTime, 1 / 20f));
             saveT -= Time.unscaledDeltaTime;
             if (saveT <= 0) { saveT = 20; Eco.Save(); }

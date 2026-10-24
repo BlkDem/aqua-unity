@@ -67,6 +67,10 @@ namespace Aquarium.Fish
         public abstract void Init(bool onGlass);
         public abstract void Update(float dt);
         public abstract void Scare(Vector3 from);
+        /// <summary>What it is doing now, for the card and the roster.</summary>
+        public abstract string Status { get; }
+        /// <summary>Roughly how big it is (for picking and the selection ring).</summary>
+        public virtual float size => 0.15f;
 
         /// <summary>Turn smoothly to stand on a surface with normal `up`, facing `fwd` (web space).</summary>
         protected void Orient(Vector3 up, Vector3 fwd, float k)
@@ -88,6 +92,7 @@ namespace Aquarium.Fish
     {
         enum S { WANDER, FOOD, FORAGE, HOP }
         S state = S.WANDER;
+        public override string Status => state switch { S.HOP => "Прыгает", S.FORAGE => "Ищет еду", S.FOOD => "Нашла корм!", _ => "Бродит по декорациям" };
         float t, dur = 3, walk, clawPhase, clawAmp, walkAmp, tilt;
         Vector3 target, heading = Vector3.right;
         (Vector3 from, Vector3 to, float t, float dur, float h)? hop;
@@ -266,6 +271,7 @@ namespace Aquarium.Fish
         public string mode = "ground";
         string pane;
         float u, v, ang, retract, t, crawl, pause;
+        public override string Status => retract > 0.5f ? "Спряталась в раковину" : mode == "glass" ? "Ползёт по стеклу" : food != null ? "Ползёт к корму" : "Исследует грунт";
         public bool reachedTop, goalTop;
         Vector3 heading = Vector3.right, normal = Vector3.up;
         Vector3? goal;
@@ -451,6 +457,8 @@ namespace Aquarium.Fish
     public sealed class Crab : Critter
     {
         float facing, t, wave, walk, amp, dir = 1, scared, pick, fast, idle;
+        public override string Status => idle > 0 ? "Размышляет" : wave > 0 ? "Машет клешнями" : "Ходит боком";
+        public override float size => 0.25f;
         Vector3? goal;
         FoodItem food;
         readonly Transform body;

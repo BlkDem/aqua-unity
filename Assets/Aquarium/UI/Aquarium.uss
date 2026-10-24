@@ -1,0 +1,206 @@
+/* The glass interface of the web version (style.css), in UI Toolkit. Sizes are CSS pixels:
+   the panel uses constant physical size at 96 dpi, as a browser does. */
+:root {
+    --glass: rgba(14, 28, 40, 0.62);
+    --glass-hi: rgba(120, 220, 255, 0.16);
+    --edge: rgba(190, 240, 255, 0.22);
+    --text: #eaf7ff;
+    --muted: rgba(220, 240, 255, 0.62);
+    --accent: #7fe3ff;
+    --gold: #ffd479;
+    -unity-font-definition: url("Fonts/Nunito-Regular.ttf");
+    color: var(--text);
+    font-size: 13px;
+}
+.semi { -unity-font-definition: url("Fonts/Nunito-SemiBold.ttf"); }
+.bold { -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+
+.screen { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.ui { transition-property: opacity; transition-duration: 0.8s; }
+.ui.immersive { opacity: 0; }
+.chrome { transition-property: opacity, translate; transition-duration: 0.6s; }
+.idle .chrome { opacity: 0; }
+.icon { width: 22px; height: 22px; color: var(--text); }
+
+/* the default theme's buttons, labels and scroll bars, made to fit the glass */
+.unity-button { background-color: rgba(0, 0, 0, 0); border-width: 0; margin: 0; padding: 0; min-height: 0; color: var(--text); -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+.unity-button:hover, .unity-button:active { background-color: rgba(0, 0, 0, 0); }
+.unity-label { padding: 0; margin: 0; }
+.unity-scroller--vertical { width: 6px; margin-left: 4px; border-width: 0; background-color: rgba(0, 0, 0, 0); }
+.unity-scroller--vertical .unity-scroller__low-button, .unity-scroller--vertical .unity-scroller__high-button { display: none; }
+.unity-scroller--vertical > .unity-scroller__slider { margin: 0; width: 6px; }
+.unity-scroller--vertical .unity-base-slider__tracker { background-color: rgba(255, 255, 255, 0.05); border-width: 0; border-radius: 3px; }
+.unity-scroller--vertical .unity-base-slider__dragger { background-color: rgba(190, 240, 255, 0.3); border-width: 0; border-radius: 3px; width: 6px; left: 0; }
+.unity-scroller--horizontal { display: none; }
+/* UI Toolkit shrinks children by default; here only the scrolling bodies give way */
+.panel > *, .card > *, .away > *, .story > .dot { flex-shrink: 0; }
+.panel > .body { flex-shrink: 1; }
+.wide { margin-top: 8px; padding: 8px; border-radius: 12px; border-width: 1px; border-color: var(--edge); background-color: rgba(127, 227, 255, 0.14); font-size: 12.5px; }
+.wide:hover { background-color: rgba(127, 227, 255, 0.28); }
+.x { position: absolute; right: 10px; top: 10px; width: 22px; height: 22px; }
+.x .icon { width: 14px; height: 14px; color: var(--muted); }
+.x:hover .icon { color: var(--text); }
+
+/* dock */
+.dock-wrap { position: absolute; left: 0; right: 0; bottom: 22px; flex-direction: row; justify-content: center; }
+.idle .dock-wrap { translate: 0 140%; }
+.dock { flex-direction: row; padding: 7px; border-radius: 22px; background-color: var(--glass); border-width: 1px; border-color: var(--edge); }
+.dock-btn { flex-direction: column; align-items: center; min-width: 70px; padding: 8px 10px 7px 10px; border-radius: 15px; margin: 0 3px; transition-property: background-color, translate; transition-duration: 0.25s; }
+.dock-btn:hover { background-color: var(--glass-hi); translate: 0 -2px; }
+.dock-btn:active { scale: 0.97 0.97; }
+.dock-btn .lbl { font-size: 11.5px; color: var(--muted); margin-top: 3px; -unity-font-definition: url("Fonts/Nunito-SemiBold.ttf"); }
+.dock-btn:hover .lbl { color: var(--text); }
+.dock-btn.feed .icon { color: var(--gold); }
+.dock-btn.pulse { background-color: rgba(255, 212, 121, 0.25); }
+
+/* hint */
+.hint { position: absolute; left: 0; right: 0; bottom: 104px; flex-direction: row; justify-content: center; opacity: 0; translate: 0 8px; transition-property: opacity, translate; transition-duration: 0.35s; }
+.hint.show { opacity: 1; translate: 0 0; }
+.hint Label { padding: 7px 14px; border-radius: 12px; background-color: var(--glass); border-width: 1px; border-color: var(--edge); font-size: 13px; }
+
+/* stories */
+.stories { position: absolute; left: 20px; top: 20px; max-width: 380px; }
+.story { flex-direction: row; align-items: center; margin-bottom: 8px; padding: 9px 14px 9px 12px; border-radius: 14px; background-color: rgba(10, 22, 32, 0.5); border-width: 1px; border-color: rgba(190, 240, 255, 0.14);
+    opacity: 0; translate: -14px 0; transition-property: opacity, translate; transition-duration: 0.7s; }
+.story .dot { flex-shrink: 0; width: 7px; height: 7px; border-radius: 4px; background-color: var(--accent); margin-right: 9px; }
+.story Label { white-space: normal; font-size: 13.5px; flex-shrink: 1; }
+.story.rare { border-color: rgba(255, 212, 121, 0.45); }
+.story.rare .dot { background-color: var(--gold); }
+.story.in { opacity: 1; translate: 0 0; }
+.story.out { opacity: 0; translate: 0 -6px; }
+.story.clickable:hover { background-color: rgba(30, 60, 80, 0.6); }
+
+/* hover label */
+.hover-label { position: absolute; padding: 6px 11px; border-radius: 11px; background-color: rgba(8, 20, 30, 0.7); border-width: 1px; border-color: var(--edge); opacity: 0; transition-property: opacity; transition-duration: 0.2s; }
+.hover-label.show { opacity: 1; }
+.hover-label .sub { font-size: 11px; color: var(--muted); }
+
+/* rings: selection and a knock on the glass */
+.ring { position: absolute; border-width: 2px; border-color: rgba(159, 234, 255, 0.55); }
+
+/* card */
+.card { position: absolute; right: 22px; top: 22px; width: 280px; padding: 18px 18px 14px 18px; border-radius: 20px; background-color: rgba(18, 38, 52, 0.72); border-width: 1px; border-color: var(--edge);
+    transition-property: opacity, translate; transition-duration: 0.35s; }
+.card.hidden { opacity: 0; translate: 20px 0; }
+.name-row { flex-direction: row; align-items: center; }
+.name { font-size: 26px; -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+.edit { width: 26px; height: 26px; margin-left: 8px; border-radius: 8px; background-color: rgba(255, 255, 255, 0.08); align-items: center; justify-content: center; }
+.edit .icon { width: 15px; height: 15px; color: var(--muted); }
+.name-input { font-size: 20px; flex-grow: 1; margin: 0; }
+.name-input > .unity-text-field__input { background-color: rgba(0, 0, 0, 0.25); border-color: var(--edge); border-radius: 8px; color: var(--text); padding: 2px 8px; -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+.species-row { flex-direction: row; align-items: center; margin-top: 2px; }
+.species { color: var(--accent); font-size: 13px; -unity-font-definition: url("Fonts/Nunito-SemiBold.ttf"); }
+.species-row .icon { width: 14px; height: 14px; color: var(--muted); margin-left: 5px; }
+.rare-tag { flex-direction: row; align-items: center; margin-top: 6px; }
+.rare-tag .icon { width: 12px; height: 12px; color: var(--gold); margin-right: 4px; }
+.rare-tag Label { font-size: 12px; color: var(--gold); -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+.trait { align-self: flex-start; margin: 10px 0 8px 0; padding: 4px 10px; border-radius: 12px; background-color: rgba(255, 212, 121, 0.14); color: var(--gold); font-size: 12px; -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+.kv { flex-direction: row; justify-content: space-between; padding: 5px 0; border-top-width: 1px; border-color: rgba(255, 255, 255, 0.06); }
+.kv .k { color: var(--muted); flex-shrink: 0; margin-right: 10px; }
+.kv .v { -unity-font-definition: url("Fonts/Nunito-SemiBold.ttf"); -unity-text-align: upper-right; white-space: normal; flex-shrink: 1; }
+.kv.small { font-size: 12px; }
+.actions { flex-direction: row; margin-top: 10px; }
+.actions Button { flex-grow: 1; padding: 8px; border-radius: 12px; border-width: 1px; border-color: var(--edge); background-color: rgba(127, 227, 255, 0.12); }
+.actions Button:hover { background-color: rgba(127, 227, 255, 0.24); }
+
+/* panels */
+.panel { position: absolute; left: 20px; bottom: 100px; width: 320px; max-height: 64%; border-radius: 20px; padding: 14px; background-color: rgba(10, 22, 32, 0.78); border-width: 1px; border-color: var(--edge);
+    opacity: 0; translate: 0 14px; transition-property: opacity, translate; transition-duration: 0.3s; display: none; }
+.panel.open { opacity: 1; translate: 0 0; }
+.panel.settings { left: auto; right: 20px; width: 310px; height: 440px; max-height: 70%; }
+.panel-head { flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.panel-head Label { font-size: 17px; -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+.panel-head .x { position: relative; right: 0; top: 0; }
+.tabs { flex-direction: row; margin-bottom: 8px; }
+.tabs Button { flex-grow: 1; flex-basis: 0; margin: 0 3px; padding: 6px; border-radius: 10px; border-width: 1px; border-color: rgba(0, 0, 0, 0); background-color: rgba(255, 255, 255, 0.06); font-size: 12.5px; color: var(--muted); }
+.tabs Button.on { border-color: var(--edge); color: var(--text); background-color: rgba(127, 227, 255, 0.14); }
+.body { flex-grow: 1; flex-shrink: 1; }
+.group { margin-bottom: 10px; }
+.gtitle { flex-direction: row; align-items: center; margin: 6px 0 4px 0; }
+.gtitle Label { font-size: 12px; color: var(--accent); -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+.gtitle .count { color: var(--muted); margin-left: 6px; -unity-font-definition: url("Fonts/Nunito-SemiBold.ttf"); }
+.gtitle .add { margin-left: auto; width: 22px; height: 22px; border-radius: 8px; border-width: 1px; border-color: var(--edge); background-color: rgba(127, 227, 255, 0.12); font-size: 15px; }
+.gtitle .add:hover { background-color: rgba(127, 227, 255, 0.28); }
+.row { flex-direction: row; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 10px; }
+.row:hover { background-color: rgba(127, 227, 255, 0.1); }
+.row .nm-box { flex-direction: row; align-items: center; flex-shrink: 0; }
+.row .nm { -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+.row .st { color: var(--muted); font-size: 12px; -unity-text-align: middle-right; flex-shrink: 1; margin-left: 8px; }
+.row .icon { width: 11px; height: 11px; color: var(--gold); margin-left: 5px; }
+.badge { font-size: 10.5px; margin-left: 6px; padding: 1px 6px; border-radius: 8px; background-color: rgba(127, 227, 255, 0.14); color: var(--accent); -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+.badge.fry { background-color: rgba(255, 212, 121, 0.16); color: var(--gold); }
+.badge.elder { background-color: rgba(255, 255, 255, 0.1); color: var(--muted); }
+.log { padding: 6px 4px; border-bottom-width: 1px; border-color: rgba(255, 255, 255, 0.05); flex-direction: row; }
+.log .tm, .hist .tm { color: var(--muted); font-size: 11px; margin-right: 8px; flex-shrink: 0; }
+.log .tx, .hist .tx { white-space: normal; flex-shrink: 1; }
+.log.rare .tx { color: var(--gold); }
+.hday { padding: 6px 4px 4px 4px; font-size: 12px; color: var(--accent); -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+.hist { flex-direction: row; padding: 5px 4px; border-bottom-width: 1px; border-color: rgba(255, 255, 255, 0.05); }
+.hist.birth .tx, .hist.rare .tx, .hist.grew .tx { color: var(--gold); }
+.hist.pair .tx, .hist.friends .tx { color: #ffc2e2; }
+.hist.plant .tx { color: #b9f2a0; }
+.hist.farewell .tx { color: var(--muted); -unity-font-style: italic; }
+.empty { color: var(--muted); padding: 10px 4px; white-space: normal; }
+.secrets { margin-top: 8px; font-size: 12px; color: var(--gold); opacity: 0.85; }
+
+/* settings */
+.sect { margin: 12px 0 2px 0; font-size: 11px; color: var(--accent); -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+.tip { margin-top: 10px; font-size: 12px; color: var(--muted); white-space: normal; }
+.setting { margin: 6px 0; }
+.setting .lab { flex-direction: row; justify-content: space-between; }
+.setting .lab Label { font-size: 12.5px; color: var(--muted); }
+.setting .lab .val { color: var(--text); -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+.setting Slider { margin: 2px 0 0 0; }
+.setting Slider .unity-base-slider__tracker { background-color: rgba(255, 255, 255, 0.15); border-width: 0; }
+.setting Slider .unity-base-slider__dragger { background-color: var(--accent); border-width: 0; border-radius: 7px; width: 14px; height: 14px; margin-top: -6px; }
+.check { flex-direction: row; align-items: center; margin: 6px 0; }
+.check .box { width: 16px; height: 16px; border-radius: 4px; border-width: 1px; border-color: var(--edge); background-color: rgba(0, 0, 0, 0.3); margin-right: 8px; }
+.check.on .box { background-color: var(--accent); }
+.check Label { font-size: 12.5px; }
+.choice { flex-direction: row; flex-wrap: wrap; margin-top: 3px; }
+.choice Button { padding: 5px 9px; margin: 0 5px 5px 0; border-radius: 10px; border-width: 1px; border-color: rgba(0, 0, 0, 0); background-color: rgba(255, 255, 255, 0.06); font-size: 12px; color: var(--muted); }
+.choice Button.on { border-color: var(--edge); color: var(--text); background-color: rgba(127, 227, 255, 0.14); }
+.backup { flex-direction: row; }
+.backup .wide { flex-grow: 1; flex-basis: 0; margin-right: 6px; font-size: 12px; }
+
+/* dialogs: "while you were away", the list of backups */
+.away { position: absolute; left: 50%; top: 50%; width: 420px; translate: -50% -46%; padding: 22px 24px 18px 24px; border-radius: 22px; background-color: rgba(16, 36, 50, 0.9); border-width: 1px; border-color: var(--edge);
+    opacity: 0; transition-property: opacity, translate; transition-duration: 0.5s; }
+.away.in { opacity: 1; translate: -50% -50%; }
+.away-title { font-size: 24px; -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+.away-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.away-list { margin: 14px 0 16px 0; }
+.away-item { flex-direction: row; margin-bottom: 8px; }
+.away-item .dot { flex-shrink: 0; width: 7px; height: 7px; border-radius: 4px; background-color: var(--gold); margin: 6px 9px 0 2px; }
+.away-item Label { font-size: 14.5px; white-space: normal; flex-shrink: 1; }
+.away-actions { flex-direction: row; }
+.away-actions Button { flex-grow: 1; flex-basis: 0; margin: 0 4px; padding: 9px; border-radius: 12px; border-width: 1px; border-color: var(--edge); background-color: rgba(127, 227, 255, 0.14); font-size: 13px; }
+.away-actions Button:hover { background-color: rgba(127, 227, 255, 0.28); }
+.file-row { padding: 7px 8px; border-radius: 10px; flex-direction: row; justify-content: space-between; }
+.file-row:hover { background-color: rgba(127, 227, 255, 0.1); }
+.file-row .sub { color: var(--muted); font-size: 12px; }
+
+/* immersive modes */
+.exit-btn { position: absolute; right: 20px; top: 20px; padding: 8px 14px; border-radius: 12px; border-width: 1px; border-color: var(--edge); background-color: rgba(8, 20, 30, 0.6); opacity: 0; transition-property: opacity; transition-duration: 0.4s; display: none; }
+.exit-btn.show { opacity: 1; }
+.bar { position: absolute; left: 0; right: 0; height: 0; background-color: #000; }
+.bar.top { top: 0; }
+.bar.bottom { bottom: 0; }
+.fade { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background-color: #000; opacity: 0; }
+.fps { position: absolute; right: 10px; bottom: 8px; font-size: 11px; color: rgba(220, 240, 255, 0.55); }
+
+/* the first moments */
+.loader { position: absolute; left: 0; top: 0; right: 0; bottom: 0; align-items: center; justify-content: center; background-color: #04121d; transition-property: opacity; transition-duration: 1.6s; }
+.loader.gone { opacity: 0; }
+.loader-title { font-size: 44px; color: #c8f2ff; -unity-font-definition: url("Fonts/Nunito-ExtraBold.ttf"); }
+.loader-sub { margin-top: 8px; color: var(--muted); font-size: 15px; }
+
+/* narrow screens (phones) */
+.narrow .dock-wrap { bottom: 10px; }
+.narrow .dock { padding: 5px; }
+.narrow .dock-btn { min-width: 46px; padding: 6px 4px; margin: 0 1px; }
+.narrow .dock-btn .lbl { font-size: 9.5px; }
+.narrow .card { left: 10px; right: 10px; width: auto; top: auto; bottom: 90px; }
+.narrow .panel { left: 10px; right: 10px; width: auto; bottom: 86px; }
+.narrow .stories { left: 10px; top: 10px; max-width: 70%; }
+.narrow .away { width: 92%; }

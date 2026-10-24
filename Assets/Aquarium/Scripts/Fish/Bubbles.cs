@@ -28,6 +28,8 @@ namespace Aquarium.Fish
         public readonly List<BubbleSource> sources = new List<BubbleSource>();
         int frame;
         readonly Matrix4x4[] matrices = new Matrix4x4[Max];
+        /// <summary>A bubble burst at the surface (for the sound).</summary>
+        public System.Action<Bubble> onPop;
 
         public BubbleSource AddSource(string name, Vector3 pos, float rate, float rMin, float rMax, float spread = 0.03f)
         {
@@ -102,7 +104,7 @@ namespace Aquarium.Fish
                     b.r /= 1.26f;
                     Spawn(b.pos + new Vector3(b.r * 1.2f, 0, 0), b.r, new Vector3(0.15f, b.vel.y, 0));
                 }
-                if (b.pos.y > top - b.r * 0.5f) list.RemoveAt(i);
+                if (b.pos.y > top - b.r * 0.5f) { list.RemoveAt(i); onPop?.Invoke(b); }
             }
             // merging (cheap, every other frame): sorted by height, only close neighbours are compared
             if (frame % 2 == 0)
