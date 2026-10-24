@@ -1,8 +1,8 @@
 // Which graphics card draws the aquarium. On Windows the cards are listed through DXGI, and the
 // choice is the system's own per-app setting (Settings > Display > Graphics), written for this
-// program: Windows starts it on the chosen card next time. Windows offers two choices — the card
-// it gives for "power saving" and the one for "high performance" — so those are the cards listed,
-// by name. Elsewhere the card is only shown.
+// program: Windows starts it on the chosen card next time. Windows offers "let Windows decide",
+// "power saving" and "high performance"; the choice is always there, each named with the card
+// Windows gives for it. Elsewhere the card is only shown.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,7 +27,7 @@ namespace Aquarium.App
 
         /// <summary>Whether the card can be chosen here (a Windows build; not in the editor).</summary>
         public static bool CanChoose =>
-#if UNITY_STANDALONE_WIN && !UNITY_EDITOR
+#if (UNITY_STANDALONE_WIN || UNITY_WEBGL) && !UNITY_EDITOR
             true;
 #else
             false;
@@ -53,6 +53,22 @@ namespace Aquarium.App
             return cards;
         }
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+        [DllImport("__Internal")] static extern string AqGpuGet();
+        [DllImport("__Internal")] static extern void AqGpuSet(string v);
+        [DllImport("__Internal")] static extern void AqReload();
+#endif
+
+        /// <summary>The card Windows gives for a preference (1 power saving, 2 high performance), or null.</summary>
+        public static string NameFor(int preference)
+        {
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+            try { return Dxgi.FirstHardware(preference)?.Description.Trim(); }
+            catch (Exception e) { Debug.LogWarning($"graphics cards: {e.Message}"); }
+#endif
+            return null;
+        }
+
         /// <summary>The card drawing now, among the listed ones.</summary>
         public static Card CurrentOf(List<Card> cards) =>
             cards.Find(c => c.vendorId == SystemInfo.graphicsDeviceVendorID && c.deviceId == SystemInfo.graphicsDeviceID)
@@ -61,6 +77,9 @@ namespace Aquarium.App
         /// <summary>The choice saved for this program (0: Windows decides).</summary>
         public static int Saved()
         {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return AqGpuGet() switch { "default" => 0, "low-power" => 1, _ => 2 };
+#endif
 #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
             var v = Win.Read(Win.Exe);
             if (v != null)
@@ -73,6 +92,10 @@ namespace Aquarium.App
         /// <summary>Save the choice for this program; it takes effect on the next start.</summary>
         public static void Choose(int preference)
         {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // in a browser: the wish for the WebGL context, read by the page at the next load
+            AqGpuSet(preference == 0 ? "default" : preference == 1 ? "low-power" : "high-performance");
+#endif
 #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
             // keep the other settings Windows may keep in the same value
             var parts = (Win.Read(Win.Exe) ?? "").Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Where(p => !p.StartsWith("GpuPreference=")).ToList();
@@ -84,6 +107,9 @@ namespace Aquarium.App
         /// <summary>Start again (on the chosen card).</summary>
         public static void Restart()
         {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            AqReload();
+#endif
 #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
             var args = Environment.GetCommandLineArgs().Skip(1).Select(a => a.Contains(' ') ? $"\"{a}\"" : a);
             System.Diagnostics.Process.Start(Win.Exe, string.Join(" ", args));

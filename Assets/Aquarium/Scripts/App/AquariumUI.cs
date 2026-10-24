@@ -281,9 +281,9 @@ namespace Aquarium.App
         {
             var p = Panel("Обитатели", "roster");
             rosterTabs = Tabs(p, new[] { ("list", "Жители"), ("hist", "История"), ("log", "Сейчас") }, ShowRosterTab).buttons;
-            rosterBody = new ScrollView { mode = ScrollViewMode.Vertical };
-            histBody = new ScrollView { mode = ScrollViewMode.Vertical };
-            logBody = new ScrollView { mode = ScrollViewMode.Vertical };
+            rosterBody = new ScrollView { mode = ScrollViewMode.Vertical, horizontalScrollerVisibility = ScrollerVisibility.Hidden };
+            histBody = new ScrollView { mode = ScrollViewMode.Vertical, horizontalScrollerVisibility = ScrollerVisibility.Hidden };
+            logBody = new ScrollView { mode = ScrollViewMode.Vertical, horizontalScrollerVisibility = ScrollerVisibility.Hidden };
             foreach (var b in new[] { rosterBody, histBody, logBody }) { b.AddToClassList("body"); p.Add(b); }
             secrets = L("", "secrets", p);
             ShowRosterTab("list");
@@ -399,7 +399,7 @@ namespace Aquarium.App
             setTabs = Tabs(p, new[] { ("life", "Аквариум"), ("view", "Изображение"), ("sound", "Звук") }, ShowSettingsTab).buttons;
             foreach (var id in new[] { "life", "view", "sound" })
             {
-                var sv = new ScrollView { mode = ScrollViewMode.Vertical };
+                var sv = new ScrollView { mode = ScrollViewMode.Vertical, horizontalScrollerVisibility = ScrollerVisibility.Hidden };
                 sv.AddToClassList("body");
                 p.Add(sv);
                 setBodies[id] = sv;
@@ -456,14 +456,17 @@ namespace Aquarium.App
             Check(view, "Показывать FPS и видеокарту", Prefs.Get("fps", 1f) > 0.5f, v => shell.SetPref("fps", v ? 1 : 0));
             L("ВИДЕОКАРТА", "sect", view);
             L($"Сейчас рисует: {GpuChoice.Current}", "tip", view);
-            var cards = GpuChoice.Cards();
-            if (GpuChoice.CanChoose && cards.Count > 1)
+            if (GpuChoice.CanChoose)
             {
-                // the cards Windows can start the aquarium on, by name; the choice is Windows' own setting for this program
+                // Windows' own setting for this program, each choice named with the card Windows gives for it
                 int saved = GpuChoice.Saved();
-                var options = cards.Select(c => (c.preference.ToString(), c.name)).Prepend(("0", "Как решит Windows")).ToArray();
+                string Named(string title, int pref) => GpuChoice.NameFor(pref) is string n ? $"{title} — {n}" : title;
+                bool web = Application.platform == RuntimePlatform.WebGLPlayer;
+                var options = web
+                    ? new[] { ("0", "Как решит браузер"), ("2", "Производительная"), ("1", "Экономная") }
+                    : new[] { ("0", "Как решит Windows"), ("2", Named("Высокая производительность", 2)), ("1", Named("Энергосбережение", 1)) };
                 Button restart = null;
-                Choice(view, "Рисовать на", options, options.Any(o => o.Item1 == saved.ToString()) ? saved.ToString() : "0", v =>
+                Choice(view, "Видеокарта", options, options.Any(o => o.Item1 == saved.ToString()) ? saved.ToString() : "0", v =>
                 {
                     GpuChoice.Choose(int.Parse(v));
                     restart.style.display = DisplayStyle.Flex;
@@ -602,7 +605,7 @@ namespace Aquarium.App
         {
             var files = Backup.List();
             var el = Dialog("Загрузить копию", files.Count == 0 ? $"Копий пока нет. Сохраните аквариум или положите файл из веб-версии в папку {Backup.Dir}" : "Нынешний аквариум будет заменён выбранной копией");
-            var list = new ScrollView();
+            var list = new ScrollView { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
             list.AddToClassList("away-list");
             list.style.maxHeight = 260;
             el.Add(list);

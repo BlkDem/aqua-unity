@@ -40,6 +40,10 @@
       productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
       devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
     };
+    // the graphics card chosen in the settings (only a wish to the browser, as in the web version)
+    let gpu = 'high-performance';
+    try { gpu = localStorage.getItem('aq.gpu') || gpu; } catch (e) { /* ignore */ }
+    config.webglContextAttributes = { powerPreference: gpu };
     const script = document.createElement('script');
     script.src = 'Build/{{{ LOADER_FILENAME }}}';
     script.onload = () => {

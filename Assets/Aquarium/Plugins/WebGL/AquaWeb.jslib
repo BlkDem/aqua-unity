@@ -211,6 +211,20 @@ mergeInto(LibraryManager.library, {
     var w = UTF8ToString(what);
     if (w === 'night') a.night = v; else a.setVolume(w, v);
   },
+  AqGpuGet: function () {
+    var v = 'high-performance';
+    try { v = localStorage.getItem('aq.gpu') || v; } catch (e) { /* ignore */ }
+    var size = lengthBytesUTF8(v) + 1, buf = _malloc(size);
+    stringToUTF8(v, buf, size);
+    return buf;
+  },
+  AqGpuSet: function (v) {
+    try { localStorage.setItem('aq.gpu', UTF8ToString(v)); } catch (e) { /* ignore */ }
+  },
+  AqReload: function () {
+    // give the save a moment to reach IndexedDB
+    setTimeout(function () { location.reload(); }, 600);
+  },
   AqDownload: function (name, text) {
     var blob = new Blob([UTF8ToString(text)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);

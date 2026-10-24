@@ -154,9 +154,9 @@
 .setting Slider .unity-base-slider__tracker { background-color: rgba(255, 255, 255, 0.15); border-width: 0; }
 .setting Slider .unity-base-slider__dragger { background-color: var(--accent); border-width: 0; border-radius: 7px; width: 14px; height: 14px; margin-top: -6px; }
 .check { flex-direction: row; align-items: center; margin: 6px 0; }
-.check .box { width: 16px; height: 16px; border-radius: 4px; border-width: 1px; border-color: var(--edge); background-color: rgba(0, 0, 0, 0.3); margin-right: 8px; }
+.check .box { flex-shrink: 0; width: 16px; height: 16px; border-radius: 4px; border-width: 1px; border-color: var(--edge); background-color: rgba(0, 0, 0, 0.3); margin-right: 8px; }
 .check.on .box { background-color: var(--accent); }
-.check Label { font-size: 12.5px; }
+.check Label { font-size: 12.5px; white-space: normal; flex-shrink: 1; }
 .choice { flex-direction: row; flex-wrap: wrap; margin-top: 3px; }
 .choice Button { padding: 5px 9px; margin: 0 5px 5px 0; border-radius: 10px; border-width: 1px; border-color: rgba(0, 0, 0, 0); background-color: rgba(255, 255, 255, 0.06); font-size: 12px; color: var(--muted); }
 .choice Button.on { border-color: var(--edge); color: var(--text); background-color: rgba(127, 227, 255, 0.14); }
