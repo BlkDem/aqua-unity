@@ -15,7 +15,9 @@ namespace Aquarium.World
         public float minDistance = 0.8f, maxDistance = 26;
         [Tooltip("Lowest the camera may go, as the web version's maxPolarAngle (0.62 pi from straight up)")]
         public float maxPolar = Mathf.PI * 0.62f;
-        public float rotateSpeed = 0.25f, zoomSpeed = 0.0015f, damping = 8;
+        public float rotateSpeed = 0.25f, damping = 8;
+        [Tooltip("How much nearer one notch of the wheel brings the camera (the Input System gives about 1 per notch on every platform)")]
+        public float zoomPerNotch = 0.15f;
         /// <summary>True while the pointer is over the interface: drags and the wheel are not the camera's then.</summary>
         public Func<bool> inputBlocked;
 
@@ -71,7 +73,7 @@ namespace Aquarium.World
                 if (dragging && mouse.rightButton.isPressed)
                     goalTarget += (-transform.right * d.x + -transform.up * d.y) * goalDistance * 0.0015f;
                 float wheel = mouse.scroll.ReadValue().y;
-                if (wheel != 0 && !blocked) goalDistance *= 1 - Mathf.Clamp(wheel * zoomSpeed, -0.3f, 0.3f);
+                if (wheel != 0 && !blocked) goalDistance *= Mathf.Pow(1 - zoomPerNotch, Mathf.Clamp(wheel, -5, 5));
             }
             float minPitch = 90 - maxPolar * Mathf.Rad2Deg;
             goalPitch = Mathf.Clamp(goalPitch, minPitch, 89);
