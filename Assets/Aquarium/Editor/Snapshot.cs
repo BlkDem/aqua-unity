@@ -168,6 +168,14 @@ namespace Aquarium.EditorTools
                 Add(m.body, m.bodyMaterial, pos, rot, f.scaleXYZ, props);
                 Add(m.fins, m.finMaterial, pos, rot, f.scaleXYZ, props);
             }
+            if (eco.plants != null)
+                foreach (var (mesh, sub, mat, m) in eco.plants.Instances())
+                {
+                    var mats = new Material[mesh.subMeshCount];
+                    for (int i = 0; i < mats.Length; i++) mats[i] = mat;
+                    Add(mesh, mat, m.GetPosition(), m.rotation, m.lossyScale, null);
+                    if (mats.Length > 1) root.transform.GetChild(root.transform.childCount - 1).GetComponent<MeshRenderer>().sharedMaterials = mats;
+                }
             foreach (var f in eco.food)
             {
                 var props = new MaterialPropertyBlock();

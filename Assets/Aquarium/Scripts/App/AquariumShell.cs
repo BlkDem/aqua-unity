@@ -29,14 +29,20 @@ namespace Aquarium.App
         public UIDocument document;
 
         public Director director;
+        public Quality quality;
         public AquariumUI ui;
         public object selected;
         public CameraMode mode = CameraMode.Free;
         bool hiddenUi, started;
 
         const float IdleSeconds = 3;
-        float lastInput, lastMove, ringAlpha, fpsT, cpuMs;
-        int fpsN;
+        float lastInput, lastMove, ringAlpha, fpsT, cpuMs, gpuMs;
+        int fpsN, timed;
+        readonly FrameTiming[] timing = new FrameTiming[1];
+        /// <summary>The last second's frame rate and frame times (the benchmark reads them).</summary>
+        public float LastFps { get; private set; }
+        public float LastCpuMs { get; private set; }
+        public float LastGpuMs { get; private set; }
         Vector2 lastPointer, downPos;
         bool down, wasFull;
 
@@ -45,8 +51,17 @@ namespace Aquarium.App
 
         void Start()
         {
+            // a measured run works on a world of its own, not the user's
+            string bench = Benchmark.Arg();
+            if (bench != null) AquariumApp.storeOverride = new Aquarium.Life.MemoryWorldStore();
             app.Boot();
             director = new Director(cam, orbit, Eco, volume);
+            quality = new Quality(volume);
+            quality.lowered = name =>
+            {
+                ui.Hint($"Качество снижено до «{name}», чтобы аквариум не тормозил");
+                ui.QualityChanged(quality.Level);
+            };
             ui = new AquariumUI(this, document.rootVisualElement);
             orbit.inputBlocked = PointerOverUi;
             ApplyPrefs();
@@ -62,13 +77,16 @@ namespace Aquarium.App
             wasFull = Screen.fullScreen;
             ui.SetFullScreen(wasFull);
             started = true;
+            if (bench != null) gameObject.AddComponent<Benchmark>().output = bench;
         }
 
         // ---------------------------------------------------------------- settings
         void ApplyPrefs()
         {
-            foreach (var k in new[] { "cycle", "stories", "quality", "dof", "bloom", "exposure", "fps", "master", "music", "fx" })
+            foreach (var k in new[] { "cycle", "stories", "dof", "bloom", "exposure", "fps", "master", "music", "fx", "autores" })
                 if (Prefs.Has(k)) ApplyPref(k, Prefs.Get(k, 0f));
+            // on the first start the preset is chosen by the graphics card
+            quality.Apply(Prefs.Has("quality") ? (int)Prefs.Get("quality", 2f) : Quality.Suggest());
             ui.ShowFps(Prefs.Get("fps", 1f) > 0.5f);
             if (Enum.TryParse(Prefs.Get("dayMode", "Auto"), out DayCycle.Mode m)) { day.mode = m; ui.SetDayLabel(DayTitle(m)); }
         }
@@ -85,7 +103,8 @@ namespace Aquarium.App
             {
                 case "cycle": day.cycleMinutes = v; break;
                 case "stories": ui.showStories = v > 0.5f; break;
-                case "quality": if (v >= 0 && v < QualitySettings.names.Length) QualitySettings.SetQualityLevel((int)v, true); break;
+                case "quality": quality.Apply((int)v); break;
+                case "autores": quality.SetAuto(v > 0.5f); break;
                 case "dof": director.dofOn = v > 0.5f; break;
                 case "bloom":
                     // the web version's bloom strength (0.38 by default) as URP bloom intensity (0.5)
@@ -279,7 +298,7 @@ namespace Aquarium.App
         void Update()
         {
             if (!started) return;
-            float t0 = Time.realtimeSinceStartup, dt = Time.unscaledDeltaTime;
+            float dt = Time.unscaledDeltaTime;
             bool immersive = mode == CameraMode.Observe || mode == CameraMode.Cinematic;
             Keys(immersive);
             Pointer_(immersive);
@@ -300,12 +319,19 @@ namespace Aquarium.App
             UnityEngine.Cursor.visible = !sleepy;
 
             fpsN++;
-            cpuMs += (Time.realtimeSinceStartup - t0) * 1000;
+            FrameTimingManager.CaptureFrameTimings();
+            if (FrameTimingManager.GetLatestTimings(1, timing) > 0) { cpuMs += (float)timing[0].cpuMainThreadFrameTime; gpuMs += (float)timing[0].gpuFrameTime; timed++; }
             if (Time.unscaledTime - fpsT > 1)
             {
                 float fps = fpsN / (Time.unscaledTime - fpsT);
-                ui.SetFps($"{Mathf.RoundToInt(fps)} fps · {Screen.width}×{Screen.height} · {SystemInfo.graphicsDeviceName}");
-                fpsN = 0; fpsT = Time.unscaledTime; cpuMs = 0;
+                string sc = quality.scale < 1 ? $" ({Mathf.RoundToInt(quality.scale * 100)}%)" : "";
+                string ms = timed > 0 ? $" · CPU {cpuMs / timed:0.0} мс" + (gpuMs > 0 ? $" · GPU {gpuMs / timed:0.0} мс" : "") : "";
+                ui.SetFps($"{Mathf.RoundToInt(fps)} fps{ms} · {Screen.width}×{Screen.height}{sc} · {QualitySettings.names[quality.Level]} · {SystemInfo.graphicsDeviceName}");
+                if (!benchmarking) quality.Adapt(fps);
+                LastFps = fps;
+                LastCpuMs = timed > 0 ? cpuMs / timed : 0;
+                LastGpuMs = timed > 0 ? gpuMs / timed : 0;
+                fpsN = 0; fpsT = Time.unscaledTime; cpuMs = 0; gpuMs = 0; timed = 0;
             }
         }
 
@@ -405,5 +431,9 @@ namespace Aquarium.App
         }
 
         void OnApplicationPause(bool paused) { if (paused && started) Eco.Save(); }
+        void OnDestroy() => quality?.Restore();
+
+        /// <summary>The benchmark sets presets itself; the automatic resolution keeps out of its way.</summary>
+        [System.NonSerialized] public bool benchmarking;
     }
 }

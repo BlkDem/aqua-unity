@@ -443,8 +443,9 @@ namespace Aquarium.App
 
             var view = setBodies["view"];
             view.Clear();
-            Choice(view, "Качество графики", QualitySettings.names.Select((n, i) => (i.ToString(), n)).ToArray(), QualitySettings.GetQualityLevel().ToString(),
+            qualityChoice = Choice(view, "Качество графики", QualitySettings.names.Select((n, i) => (i.ToString(), n)).ToArray(), shell.quality.Level.ToString(),
                 v => { shell.SetPref("quality", int.Parse(v)); Hint($"Качество: {QualitySettings.names[int.Parse(v)]}"); });
+            Check(view, "Авто-разрешение: держать 30+ FPS", shell.quality.auto, v => shell.SetPref("autores", v ? 1 : 0));
             Check(view, "Глубина резкости (в режимах «Наблюдать» и «Кино»)", shell.director.dofOn, v => shell.SetPref("dof", v ? 1 : 0));
             Range(view, "Свечение", 0, 1.5f, Prefs.Get("bloom", 0.38f), v => $"{Mathf.RoundToInt(v * 100)}%", v => shell.SetPref("bloom", v));
             Range(view, "Яркость", 0.6f, 1.6f, shell.day.exposureMul, v => $"{Mathf.RoundToInt(v * 100)}%", v => shell.SetPref("exposure", v));
@@ -474,7 +475,17 @@ namespace Aquarium.App
             });
         }
 
-        static void Choice(VisualElement parent, string title, (string value, string text)[] options, string current, Action<string> picked)
+        VisualElement qualityChoice;
+
+        /// <summary>The preset changed by itself (lowered to keep it smooth): show it in the settings.</summary>
+        public void QualityChanged(int level)
+        {
+            if (qualityChoice == null) return;
+            int i = 0;
+            foreach (var b in qualityChoice.Query<Button>().ToList()) b.EnableInClassList("on", i++ == level);
+        }
+
+        static VisualElement Choice(VisualElement parent, string title, (string value, string text)[] options, string current, Action<string> picked)
         {
             var box = E("setting", parent);
             var lab = E("lab", box);
@@ -492,6 +503,7 @@ namespace Aquarium.App
                 }, row);
                 buttons.Add((b, v));
             }
+            return row;
         }
 
         static void Range(VisualElement parent, string title, float min, float max, float value, Func<float, string> fmt, Action<float> changed, bool whole = false)

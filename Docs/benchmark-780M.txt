@@ -1,0 +1,17 @@
+Живой аквариум — замер 2026-10-24 10:43
+AMD Radeon 780M Graphics (Direct3D12, 48387 МБ), AMD Ryzen 7 7840HS w/ Radeon 780M Graphics , 64771 МБ ОЗУ
+экран 1920×1080 (Windowed, монитор 2560×1600, dpi 168), рыб 52, обитателей 15, предложен пресет «Среднее»
+
+пресет      ракурс      fps   кадр мс  95% мс  CPU мс  GPU мс  draw  setpass  треуг.
+Низкое      фронт        60     16,7    16,7     4,2     8,2   330      117    1372K
+Низкое      крупно       60     16,7    16,7     3,3    10,5   263      116    1378K
+Среднее     фронт        60     16,7    16,7     3,3    10,5   326      114    1375K
+Среднее     крупно       60     16,7    16,8     3,9    10,7   262      114    1389K
+Высокое     фронт        60     16,7    16,8     3,7    10,6   329      115    1370K
+Высокое     крупно       60     16,7    16,7     4,5    12,9   339      143    1697K
+Ультра      фронт        60     16,7    16,8     4,2    11,3   441      131    2009K
+Ультра      крупно       53     18,8    19,4     5,7    18,0   422      167    2254K
+Высокое     кино         60     16,7    16,7     4,6    10,3   250      154    1368K
+
+память: текстуры 141 МБ (344), меши 67 МБ (226), всего выделено 666 МБ, управляемая куча 8 МБ
+самые тяжёлые текстуры: _CameraDepthAttachment_1920x1080_D32_SFloat_S8_UInt_Tex2D_MSAA4x 1920×1080 RenderTexture 63,3 МБ, _CameraTargetAttachment_1920x1080_B10G11R11_UFloatPack32_Tex2D_MSAA4x 1920×1080 RenderTexture 39,6 МБ, _CameraDepthTexture_1920x1080_R32_SFloat_Tex2D 1920×1080 RenderTexture 7,9 МБ, CameraColorDepthOfFieldBokeh_1920x1080_B10G11R11_UFloatPack32_Tex2D 1920×1080 RenderTexture 7,9 МБ, _MainLightShadowmapTexture_2048x1024_Shadowmap 2048×1024 RenderTexture 4,0 МБ, _PongTexture_960x540_R16G16B16A16_SFloat_Tex2D 960×540 RenderTexture 4,0 МБ, _PingTexture_960x540_R16G16B16A16_SFloat_Tex2D 960×540 RenderTexture 4,0 МБ, _BloomMipUp0_960x540_B10G11R11_UFloatPack32_Tex2D 960×540 RenderTexture 2,0 МБ, _BloomMipDown0_960x540_B10G11R11_UFloatPack32_Tex2D 960×540 RenderTexture 2,0 МБ, _FullCoCTexture_1920x1080_R8_UNorm_Tex2D 1920×1080 RenderTexture 2,0 МБ,  1024×1024 Alpha8 1,0 МБ,  1024×1024 Alpha8 1,0 МБ

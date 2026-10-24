@@ -27,6 +27,8 @@ Shader "Aquarium/Dust"
                 half _Ray;
                 half _Size;
             CBUFFER_END
+            // share of particles left out by the quality preset (0: all are drawn)
+            float _AqDustCut;
             struct A { float4 positionOS : POSITION; float2 corner : TEXCOORD0; float2 seed : TEXCOORD1; };
             struct V { float4 positionCS : SV_POSITION; float2 corner : TEXCOORD0; float alpha : TEXCOORD1; float big : TEXCOORD2; };
             V vert(A i)
@@ -47,6 +49,8 @@ Shader "Aquarium/Dust"
                 o.alpha = (0.25 + ray * 0.9) * lerp(1.0, 0.18, big) * smoothstep(0.2, 1.5, p.y);
                 o.big = big;
                 o.corner = i.corner;
+                // a quality preset with less dust: these particles collapse to nothing
+                if (frac(seed * 7.31 + 0.13) < _AqDustCut) o.positionCS = float4(0, 0, -1, 1);
                 return o;
             }
             half4 frag(V i) : SV_Target

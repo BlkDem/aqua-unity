@@ -40,6 +40,77 @@ namespace Aquarium.Fish
         readonly PlantModelSet models;
         readonly Transform parent;
         readonly List<Growing> growing = new List<Growing>();
+
+        /// <summary>
+        /// Every plant model variant is drawn as one instanced batch (a draw call per variant and
+        /// part rather than per clump, as in the web version); the plants' objects only carry
+        /// their transforms.
+        /// </summary>
+        sealed class Batch
+        {
+            public Mesh mesh;
+            public int sub;
+            public Material mat;
+            public Matrix4x4 local;
+            public RenderParams rp;
+            public readonly List<Transform> items = new List<Transform>();
+            public readonly List<Matrix4x4> matrices = new List<Matrix4x4>();
+        }
+
+        readonly Dictionary<GameObject, List<Batch>> batches = new Dictionary<GameObject, List<Batch>>();
+        bool dirty = true;
+
+        List<Batch> BatchesOf(GameObject prefab)
+        {
+            if (batches.TryGetValue(prefab, out var list)) return list;
+            list = new List<Batch>();
+            var rootT = prefab.transform;
+            foreach (var r in prefab.GetComponentsInChildren<MeshRenderer>())
+            {
+                var mesh = r.GetComponent<MeshFilter>()?.sharedMesh;
+                if (!mesh) continue;
+                var local = rootT.worldToLocalMatrix * r.transform.localToWorldMatrix;
+                for (int s = 0; s < r.sharedMaterials.Length && s < mesh.subMeshCount; s++)
+                    list.Add(new Batch
+                    {
+                        mesh = mesh, sub = s, mat = r.sharedMaterials[s], local = local,
+                        rp = new RenderParams(r.sharedMaterials[s])
+                        {
+                            shadowCastingMode = r.shadowCastingMode, receiveShadows = true,
+                            worldBounds = new Bounds(Vector3.up * 3, new Vector3(16, 10, 8)),
+                        },
+                    });
+            }
+            batches[prefab] = list;
+            return list;
+        }
+
+        /// <summary>Every plant part with its matrix (tools draw them as ordinary objects for snapshots).</summary>
+        public IEnumerable<(Mesh mesh, int sub, Material mat, Matrix4x4 matrix)> Instances()
+        {
+            foreach (var list in batches.Values)
+                foreach (var b in list)
+                    foreach (var t in b.items) yield return (b.mesh, b.sub, b.mat, t.localToWorldMatrix * b.local);
+        }
+
+        /// <summary>Queue the plants for drawing this frame (for one camera only, if given).</summary>
+        public void Draw(Camera only = null)
+        {
+            foreach (var list in batches.Values)
+                foreach (var b in list)
+                {
+                    if (dirty)
+                    {
+                        b.matrices.Clear();
+                        foreach (var t in b.items) b.matrices.Add(t.localToWorldMatrix * b.local);
+                    }
+                    if (b.matrices.Count == 0) continue;
+                    var rp = b.rp;
+                    rp.camera = only;
+                    Graphics.RenderMeshInstanced(rp, b.mesh, b.sub, b.matrices);
+                }
+            dirty = false;
+        }
         readonly Dictionary<string, int> counter = new Dictionary<string, int>();
 
         static float Growth(PlantRecord rec, double t) => 0.5f + 0.5f * (1 - Mathf.Exp(-(float)(System.Math.Max(0, t - rec.Planted) / (5 * Day))));
@@ -88,9 +159,11 @@ namespace Aquarium.Fish
             var (node, variants) = Nodes[kind];
             var prefab = models ? models.Get($"{node}{rec.Variant % variants}") : null;
             if (!prefab) return;
-            var go = Object.Instantiate(prefab, parent);
-            go.name = id;
+            var go = new GameObject(id);
             var t = go.transform;
+            t.SetParent(parent, false);
+            foreach (var b in BatchesOf(prefab)) b.items.Add(t);
+            dirty = true;
             t.localPosition = new Vector3(-x, y ?? eco.HeightAt(x, z) - 0.03f, z);
             t.localRotation = Aquarium.World.WebSpace.Yaw((float)rec.Rot);
             var g = new Growing { obj = t, kind = kind, id = id, x = x, z = z, baseScale = scale * (float)rec.Gene, rec = rec };
@@ -102,6 +175,7 @@ namespace Aquarium.Fish
         public int Tick(double t)
         {
             int sprouted = 0;
+            dirty = true;   // growth changes the sizes
             for (int i = 0; i < growing.Count; i++)   // new plants are appended and spread too
             {
                 var g = growing[i];

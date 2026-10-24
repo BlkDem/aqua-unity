@@ -29,7 +29,7 @@ namespace Aquarium.EditorTools
             set.models.Clear();
             foreach (var key in FishSpecies.ModelKeys())
             {
-                var src = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Aquarium/Resources/Models/Fish/{key}.glb");
+                var src = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Aquarium/Models/Fish/{key}.glb");
                 if (!src) { Debug.LogWarning($"fish model {key} missing"); continue; }
                 var sp = FishSpecies.All[key.Split('-')[0]];
                 set.models.Add(BuildOne(key, sp, src.transform));
@@ -118,8 +118,8 @@ namespace Aquarium.EditorTools
             var srcFin = Node(root, "Fins").GetComponent<MeshRenderer>().sharedMaterial;
             var shader = Shader.Find("Aquarium/Fish");
             var bm = new Material(shader) { enableInstancing = true };
-            bm.SetTexture("_BaseMap", srcBody.GetTexture("baseColorTexture"));
-            var nrm = srcBody.GetTexture("normalTexture");
+            bm.SetTexture("_BaseMap", TextureStore.Get(srcBody.GetTexture("baseColorTexture"), TexKind.Color));
+            var nrm = TextureStore.Get(srcBody.GetTexture("normalTexture"), TexKind.Normal);
             if (nrm) { bm.SetTexture("_BumpMap", nrm); bm.EnableKeyword("_NORMALMAP"); }
             bm.SetFloat("_BumpScale", 0.7f);
             bm.SetFloat("_Roughness", 0.3f);
@@ -127,7 +127,7 @@ namespace Aquarium.EditorTools
             bm.SetFloat("_CausticStrength", 0.55f);
             if (sp.glow) bm.SetColor("_EmissionColor", WebHex("#8fe9ff") * 0.4f);
             var fm = new Material(shader) { enableInstancing = true };
-            fm.SetTexture("_BaseMap", srcFin.GetTexture("baseColorTexture"));
+            fm.SetTexture("_BaseMap", TextureStore.Get(srcFin.GetTexture("baseColorTexture"), TexKind.Color));
             fm.SetFloat("_Fins", 1);
             fm.EnableKeyword("_FINS");
             fm.SetFloat("_Roughness", 0.35f);
@@ -140,10 +140,37 @@ namespace Aquarium.EditorTools
             fm.renderQueue = 3000;
             fm.SetOverrideTag("RenderType", "Transparent");
             if (sp.glow) fm.SetColor("_EmissionColor", WebHex("#8fb6ff") * 0.6f);
-            return new FishModel { key = key, body = body, fins = fins, bodyMaterial = SaveMat(bm, $"{key}_body"), finMaterial = SaveMat(fm, $"{key}_fins") };
+            return new FishModel { key = key, body = body, fins = fins, bodyLods = Lods(body), bodyMaterial = SaveMat(bm, $"{key}_body"), finMaterial = SaveMat(fm, $"{key}_fins") };
         }
 
         static Color WebHex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c; }
+
+        /// <summary>
+        /// Simpler versions of a body (Unity's mesh LOD generator): about a quarter and a sixteenth
+        /// of the triangles, each saved as a mesh of its own (the instanced draw picks one).
+        /// </summary>
+        static Mesh[] Lods(Mesh body)
+        {
+            var tmp = Object.Instantiate(body);
+            MeshLodUtility.GenerateMeshLods(tmp);
+            var result = new List<Mesh>();
+            using (var data = Mesh.AcquireReadOnlyMeshData(tmp))
+            {
+                var all = tmp.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16
+                    ? data[0].GetIndexData<ushort>().Select(i => (int)i).ToArray()
+                    : data[0].GetIndexData<int>().ToArray();
+                foreach (int level in new[] { 2, 4 })
+                {
+                    var r = tmp.GetLod(0, Mathf.Min(level, tmp.lodCount - 1));
+                    var lod = Object.Instantiate(body);
+                    lod.name = $"{body.name}_lod{level}";
+                    lod.SetIndices(all.Skip((int)r.indexStart).Take((int)r.indexCount).ToArray(), MeshTopology.Triangles, 0, false);
+                    result.Add(Save(lod));
+                }
+            }
+            Object.DestroyImmediate(tmp);
+            return result.ToArray();
+        }
 
         static Mesh Save(Mesh m)
         {

@@ -7,12 +7,12 @@ using UnityEngine;
 namespace Aquarium.EditorTools
 {
     /// <summary>Development helpers run from the command line (-executeMethod).</summary>
-    public static class Dev
+    public static partial class Dev
     {
         public static void DumpModels()
         {
             var sb = new StringBuilder();
-            foreach (var path in AssetDatabase.FindAssets("t:GameObject", new[] { "Assets/Aquarium/Resources/Models" }).Select(AssetDatabase.GUIDToAssetPath).Distinct())
+            foreach (var path in AssetDatabase.FindAssets("t:GameObject", new[] { "Assets/Aquarium/Models" }).Select(AssetDatabase.GUIDToAssetPath).Distinct())
             {
                 var go = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                 sb.AppendLine($"== {path}");
@@ -20,7 +20,7 @@ namespace Aquarium.EditorTools
             }
             foreach (var (file, name) in new[] { ("Decor/castle.glb", "Castle"), ("Plants/vallisneria.glb", null), ("Decor/castle.glb", "GlowWindow") })
             {
-            var mat = AssetDatabase.LoadAllAssetsAtPath("Assets/Aquarium/Resources/Models/" + file).OfType<Material>().FirstOrDefault(m => name == null || m.name == name);
+            var mat = AssetDatabase.LoadAllAssetsAtPath("Assets/Aquarium/Models/" + file).OfType<Material>().FirstOrDefault(m => name == null || m.name == name);
             if (mat)
             {
                 sb.AppendLine($"material {mat.name} shader {mat.shader.name}");

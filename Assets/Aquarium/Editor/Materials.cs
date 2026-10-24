@@ -27,7 +27,11 @@ namespace Aquarium.EditorTools
 
         static readonly Dictionary<string, Material> made = new Dictionary<string, Material>();
 
-        public static void Reset() => made.Clear();
+        public static void Reset()
+        {
+            made.Clear();
+            TextureStore.Reset();
+        }
 
         /// <summary>Create (or overwrite) a material asset.</summary>
         public static Material Save(string name, Material m)
@@ -114,13 +118,13 @@ namespace Aquarium.EditorTools
             {
                 m = new Material(Lit);
                 m.SetColor("_BaseColor", src.GetColor("baseColorFactor"));
-                var baseTex = src.GetTexture("baseColorTexture");
+                var baseTex = TextureStore.Get(src.GetTexture("baseColorTexture"), TexKind.Color);
                 if (baseTex) m.SetTexture("_BaseMap", baseTex);
-                var orm = src.GetTexture("metallicRoughnessTexture");
+                var orm = TextureStore.Get(src.GetTexture("metallicRoughnessTexture"), TexKind.Linear);
                 if (orm) m.SetTexture("_OrmMap", orm);
                 m.SetFloat("_Roughness", src.GetFloat("roughnessFactor"));
                 m.SetFloat("_Metallic", src.GetFloat("metallicFactor"));
-                var n = src.GetTexture("normalTexture");
+                var n = TextureStore.Get(src.GetTexture("normalTexture"), TexKind.Normal);
                 if (n)
                 {
                     m.SetTexture("_BumpMap", n);
@@ -128,7 +132,7 @@ namespace Aquarium.EditorTools
                     m.EnableKeyword("_NORMALMAP");
                 }
                 var e = src.GetColor("emissiveFactor");
-                var et = src.GetTexture("emissiveTexture");
+                var et = TextureStore.Get(src.GetTexture("emissiveTexture"), TexKind.Color);
                 if (et) m.SetTexture("_EmissionMap", et);
                 m.SetColor("_EmissionColor", role == "Glow" ? e * 0.15f : e);
                 // textures with alpha (feathery leaves) are cutouts: no sorting, no blending

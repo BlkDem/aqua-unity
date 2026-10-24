@@ -26,7 +26,7 @@ namespace Aquarium.EditorTools
     {
         public const string ScenePath = "Assets/Aquarium/Scenes/Aquarium.unity";
         const string MeshDir = "Assets/Aquarium/Art/Generated/Meshes";
-        const string Models = "Assets/Aquarium/Resources/Models";
+        const string Models = "Assets/Aquarium/Models";
         const float W = Terrain.W, D = Terrain.D, H = Terrain.H;
 
         static Random rnd;
@@ -64,6 +64,8 @@ namespace Aquarium.EditorTools
             walkables.Clear();
             Directory.CreateDirectory(MeshDir);
             ConfigurePipeline();
+            QualityBuilder.Build();
+            PlayerBuild.Configure();
 
             root = new GameObject("Aquarium").transform;
             tank = Group("Tank");
@@ -81,12 +83,66 @@ namespace Aquarium.EditorTools
             AddWalkColliders();
             BuildPlants();
             BuildRaysAndDust();
+            MergeStatic();
             BuildCameraAndPost();
             BakeEnvironment();
             BuildApp();
             BuildShell(root.GetComponentInChildren<Camera>(), day.volume);
             day.mode = DayCycle.Mode.Day;
             day.Snap();
+        }
+
+        /// <summary>
+        /// Draw calls are the main cost (as in the web version's mergeStatic): the still, opaque
+        /// scenery that does not sway is merged into one mesh per material. Things that move or
+        /// sway, transparent ones and the growing plants keep their own renderers; colliders stay.
+        /// </summary>
+        static void MergeStatic()
+        {
+            var keep = new HashSet<Transform>();
+            if (layout.chestLid) keep.Add(layout.chestLid);
+            if (layout.duck) keep.Add(layout.duck);
+            bool Moving(Transform t)
+            {
+                for (var p = t; p != null; p = p.parent)
+                    if (keep.Contains(p) || p == growing || p.GetComponent<Floater>() || p.name == "Water") return true;
+                return false;
+            }
+            var parts = new List<(MeshRenderer r, MeshFilter f)>();
+            foreach (var r in root.GetComponentsInChildren<MeshRenderer>())
+            {
+                var f = r.GetComponent<MeshFilter>();
+                if (!f || !f.sharedMesh || Moving(r.transform)) continue;
+                if (r.sharedMaterials.Any(m => !m || m.renderQueue >= 2500 || (m.HasProperty("_Sway") && m.GetFloat("_Sway") > 0))) continue;
+                parts.Add((r, f));
+            }
+            var merged = Group("Merged");
+            int before = 0, after = 0;
+            var groups = parts.SelectMany(p => Enumerable.Range(0, p.r.sharedMaterials.Length).Select(i => (p.r, p.f, i, mat: p.r.sharedMaterials[i])))
+                .GroupBy(x => (x.mat, x.r.shadowCastingMode, x.r.receiveShadows));
+            foreach (var g in groups)
+            {
+                var list = g.ToList();
+                before += list.Count;
+                var combine = list.Select(x => new CombineInstance { mesh = x.f.sharedMesh, subMeshIndex = Mathf.Min(x.i, x.f.sharedMesh.subMeshCount - 1), transform = merged.worldToLocalMatrix * x.f.transform.localToWorldMatrix }).ToArray();
+                var mesh = new Mesh { name = $"Merged_{g.Key.mat.name}", indexFormat = IndexFormat.UInt32 };
+                mesh.CombineMeshes(combine, true, true);
+                mesh.RecalculateBounds();
+                var go = Obj(mesh.name, merged, SaveMesh(mesh), g.Key.mat, Vector3.zero, null, g.Key.shadowCastingMode != ShadowCastingMode.Off);
+                go.GetComponent<MeshRenderer>().receiveShadows = g.Key.receiveShadows;
+                foreach (var x in list)
+                {
+                    // the sub-mesh is drawn by the merged one now
+                    var mats = x.r.sharedMaterials;
+                    mats[x.i] = null;
+                    x.r.sharedMaterials = mats;
+                }
+                after++;
+            }
+            // renderers with nothing left to draw go; their objects stay (colliders, names, layout)
+            foreach (var (r, f) in parts)
+                if (r.sharedMaterials.All(m => m == null)) { UnityEngine.Object.DestroyImmediate(r); UnityEngine.Object.DestroyImmediate(f); }
+            Debug.Log($"Merged {before} static sub-meshes into {after} meshes");
         }
 
         static Transform Group(string name)
@@ -726,7 +782,8 @@ namespace Aquarium.EditorTools
             }
             var mat = new Material(Materials.FromGltf(src.GetComponent<MeshRenderer>().sharedMaterial, "moss", "Static"));
             mat.SetFloat("_VertexColor", 1);
-            Obj("Moss", plants, SaveMesh(Merge(src.sharedMesh, mats, cols, false, "Moss")), Materials.Save("moss_field", mat), Vector3.zero);
+            // like the grass, the moss only receives shadows (as in the web version)
+            Obj("Moss", plants, SaveMesh(Merge(src.sharedMesh, mats, cols, false, "Moss")), Materials.Save("moss_field", mat), Vector3.zero, null, false);
         }
 
         static void BuildCorals()

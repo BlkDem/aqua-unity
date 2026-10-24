@@ -109,7 +109,7 @@ namespace Aquarium.Fish
             title = "Креветка";
             inner = root.GetChild(0);
             // the shell, legs and whiskers all take the shrimp's colour (cherry, blue, yellow...)
-            foreach (var r in root.GetComponentsInChildren<MeshRenderer>())
+            foreach (var r in root.GetComponentsInChildren<Renderer>())
             {
                 var mats = r.sharedMaterials.Select(m => { var c = new Material(m); c.SetColor("_BaseColor", color); return c; }).ToArray();
                 r.sharedMaterials = mats;
@@ -290,8 +290,12 @@ namespace Aquarium.Fish
             shellRest = shell.localPosition;
             if (type == "mystery")
             {
-                var r = shell.GetComponent<MeshRenderer>();
-                r.sharedMaterials = r.sharedMaterials.Select(m => { var c = new Material(m); c.SetColor("_BaseColor", ShellTints[id % ShellTints.Length]); return c; }).ToArray();
+                // the shell has the last material slot of the stitched mesh to itself
+                var r = root.GetComponentInChildren<Renderer>();
+                var mats = r.sharedMaterials;
+                mats[mats.Length - 1] = new Material(mats[mats.Length - 1]);
+                mats[mats.Length - 1].SetColor("_BaseColor", ShellTints[id % ShellTints.Length]);
+                r.sharedMaterials = mats;
             }
             tents = new[] { J("TentL"), J("TentR") };
             root.localScale = Vector3.one * Types[type].scale * Rnd.R(0.9f, 1.1f);

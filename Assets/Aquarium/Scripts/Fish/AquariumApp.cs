@@ -127,6 +127,7 @@ namespace Aquarium.Fish
             Eco.PushPlants(push);
             Shader.SetGlobalVectorArray(FishId, push);
             fishRenderer.Draw(Eco.night, only);
+            Eco.plants?.Draw(only);
             foodRenderer.Draw(Eco.food, only);
             Eco.bubbles.Draw(bubbleMesh, bubbleMaterial, only);
         }

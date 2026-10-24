@@ -11,6 +11,8 @@ namespace Aquarium.Fish
     {
         public string key;
         public Mesh body, fins;
+        [Tooltip("Simpler bodies for fish small on the screen (a quarter, a sixteenth of the triangles); the last also casts the shadows")]
+        public Mesh[] bodyLods = new Mesh[0];
         public Material bodyMaterial, finMaterial;
     }
 

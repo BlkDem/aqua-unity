@@ -16,100 +16,160 @@ MonoBehaviour:
   - key: neon
     body: {fileID: 4300000, guid: e589bf28696826241b826821866b7325, type: 2}
     fins: {fileID: 4300000, guid: e287509974722ad4090d5e46d14ac180, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: 790f40e037f4b3b478020ef7e6e43b44, type: 2}
+    - {fileID: 4300000, guid: c3f72a8ddd0043241aa7c73e500b00d2, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 7e8e603336c434143a779a59c5634309, type: 2}
     finMaterial: {fileID: 2100000, guid: 586db2fceddbadc41b40452de676fe0e, type: 2}
   - key: guppy-0
     body: {fileID: 4300000, guid: 11e77e8ddf47a284594c71abb8a84bd0, type: 2}
     fins: {fileID: 4300000, guid: 5f62077143df1054fb9a7b2293ac63e9, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: faeb9603d500301489d495c712956514, type: 2}
+    - {fileID: 4300000, guid: b408ad7d6c505e6458675899537bb593, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 467d5f1f52a1da847a47bae14788cebf, type: 2}
     finMaterial: {fileID: 2100000, guid: f0687806c279679498fdd2c7449734ec, type: 2}
   - key: guppy-1
     body: {fileID: 4300000, guid: de06efdd705b0d642a07802e8f234211, type: 2}
     fins: {fileID: 4300000, guid: a56a681e007fd5a46be168d02d6aa2af, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: 254a87944179cd744a59da8e9636b7d3, type: 2}
+    - {fileID: 4300000, guid: d06c9dfcb438dda4496f61356d738bb2, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 5944d3fa19d923b44b02f1fbfa5f7bdc, type: 2}
     finMaterial: {fileID: 2100000, guid: 30f3020de032b004f96e1ffb171b3e48, type: 2}
   - key: guppy-2
     body: {fileID: 4300000, guid: 07241bb284ccc8d428fae78d6459e070, type: 2}
     fins: {fileID: 4300000, guid: a3ca339fc86f70d4e8b93a2f2835dbe8, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: 3e1f24dd9bd7add4fa5bc5f808523510, type: 2}
+    - {fileID: 4300000, guid: ca8dc32b9d677de44af0c1eeacb5e607, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 5f665c3aeb19c6c4a89074de3695f88f, type: 2}
     finMaterial: {fileID: 2100000, guid: eba92aca474be7d44811006a6403d7d8, type: 2}
   - key: guppy-3
     body: {fileID: 4300000, guid: 9c17749d99d793342a05eb4e683c8b55, type: 2}
     fins: {fileID: 4300000, guid: 69fc9363f3ab08b439d3d4d0450598f2, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: 8ff5f33786a82354884510b6d108451c, type: 2}
+    - {fileID: 4300000, guid: e59fd29e9d2dc524483d91bced770f48, type: 2}
     bodyMaterial: {fileID: 2100000, guid: ecfef8f6b78bcbf4d9360adf3ee040fe, type: 2}
     finMaterial: {fileID: 2100000, guid: 60760e87d04c7364ba76ab46a59b8eb5, type: 2}
   - key: guppy-4
     body: {fileID: 4300000, guid: aed4a591b8f75b343a8794be455c3e99, type: 2}
     fins: {fileID: 4300000, guid: cb94ad084cc7bb84f826305e98243460, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: b78a175beaa156d498c37986381b5542, type: 2}
+    - {fileID: 4300000, guid: 6055b43d2318def499948da49198797e, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 5244844e319201e4d92beec3a4c219b9, type: 2}
     finMaterial: {fileID: 2100000, guid: ce761792ffc5f6b46b3b72b9f3011d5b, type: 2}
   - key: guppy-5
     body: {fileID: 4300000, guid: 150fc0115192681488c04a852863849f, type: 2}
     fins: {fileID: 4300000, guid: fcb46ffdcab558046a0d121e8c102858, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: b4097e984cad5df4480ff44443770e4c, type: 2}
+    - {fileID: 4300000, guid: 47adb74133f2ede41bc2cebb5fafca47, type: 2}
     bodyMaterial: {fileID: 2100000, guid: fe0fb870e817475418913bd21c4fdd6f, type: 2}
     finMaterial: {fileID: 2100000, guid: 2cfd5bec377dc3345954805cc7d3a355, type: 2}
   - key: guppy-6
     body: {fileID: 4300000, guid: 4a314c677c2dfc347802d96f57b4168b, type: 2}
     fins: {fileID: 4300000, guid: 3786fd4e51f3b4945aa6afe7474ff33a, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: f5a20dfd010da054f80349502092fea0, type: 2}
+    - {fileID: 4300000, guid: a92fae60e85309f4097abd5b7fcbfbd6, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 277d47997b950134392c416f823fe336, type: 2}
     finMaterial: {fileID: 2100000, guid: 364890ccfce35324e80c88fa8f99c6c2, type: 2}
   - key: goldfish
     body: {fileID: 4300000, guid: 5bf55c3d8e6bf43499f99dd3812e078e, type: 2}
     fins: {fileID: 4300000, guid: d50c225f6d1c250409ae6acc161e1347, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: 5e410eb93e3da204d9e7c113759f16cb, type: 2}
+    - {fileID: 4300000, guid: c5e65fae3cbb43b4788303f12b651879, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 1e6b234b36a7d6f4e8b24ab3ab5f6666, type: 2}
     finMaterial: {fileID: 2100000, guid: 2153b907729c82247a8c5522681353af, type: 2}
   - key: angelfish
     body: {fileID: 4300000, guid: 08d597b28f9cf2949ab710c1f7650a15, type: 2}
     fins: {fileID: 4300000, guid: b516e844b592a564fb52609194d745fb, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: e41576b5a4576c14497a042b0d12a2d4, type: 2}
+    - {fileID: 4300000, guid: 0a890dd64aba56b48bdded76afd7d3a4, type: 2}
     bodyMaterial: {fileID: 2100000, guid: aeefeabefbcae4547bcb9c4d2d14b67a, type: 2}
     finMaterial: {fileID: 2100000, guid: 29782d77ab4614e41ab562f2a8e20cdb, type: 2}
   - key: clown
     body: {fileID: 4300000, guid: 7a0e4357ef26459418b4e25bb2f4b5df, type: 2}
     fins: {fileID: 4300000, guid: 36376e31a2ca5684baa2f353f2b4a716, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: 57d548f80726a11469e4135b8a1051f3, type: 2}
+    - {fileID: 4300000, guid: 0ebf7fbaf1db7a84286e7de082e5e8f6, type: 2}
     bodyMaterial: {fileID: 2100000, guid: c4966212b83ef9447aac6a925d9dddf9, type: 2}
     finMaterial: {fileID: 2100000, guid: 439807cb2e3076c4b91ee93b599da1fa, type: 2}
   - key: cory
     body: {fileID: 4300000, guid: dd58178231cc61b49a159976c219e923, type: 2}
     fins: {fileID: 4300000, guid: 81b794232152a0843b8b6f1027317d05, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: ff0fd4690e7cd794fb50f072159c092f, type: 2}
+    - {fileID: 4300000, guid: 0c601a14dfce7e74b8066caea46e4b40, type: 2}
     bodyMaterial: {fileID: 2100000, guid: d641c4ff66a699741bccff0bceb47d4f, type: 2}
     finMaterial: {fileID: 2100000, guid: a563f3908d551604599005d03c0748aa, type: 2}
   - key: cichlid-0
     body: {fileID: 4300000, guid: 9e25830fe6309ec4eab4c0135c6b0cec, type: 2}
     fins: {fileID: 4300000, guid: 21f68567540dbfb4ba8c7c7ea7291971, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: 1fbb0653c279e874198c9cb66f77aabc, type: 2}
+    - {fileID: 4300000, guid: d2111f7d6980d5a488619b0ebd9c24b7, type: 2}
     bodyMaterial: {fileID: 2100000, guid: dbd796aeb14ba4149a8f508fb944e5f2, type: 2}
     finMaterial: {fileID: 2100000, guid: 3180e4ee5b6ba4e48988b1e2e2271a7e, type: 2}
   - key: cichlid-1
     body: {fileID: 4300000, guid: 0f21df997c750e94c8f34888f5d95d3b, type: 2}
     fins: {fileID: 4300000, guid: 1ed381d83b4224346a51d05a160afd04, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: c6778823586fbdb4b820a4245f442eff, type: 2}
+    - {fileID: 4300000, guid: 43646a592df285946b61f71ed43339d9, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 409f0cd1100186344b396afc6bfd622a, type: 2}
     finMaterial: {fileID: 2100000, guid: f53fda76d3d0fd341b77599a45eecd9e, type: 2}
   - key: discus-0
     body: {fileID: 4300000, guid: eb0db9d1a59e0894f807891934216bd4, type: 2}
     fins: {fileID: 4300000, guid: 5e2ba4dd7def8384bbc6b7a64e9f7887, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: dec272c2f1556414bb2e24066a6ca9c1, type: 2}
+    - {fileID: 4300000, guid: ada4497b984fe6044860c47b3c9075b4, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 3ddc997855097a34aab00544ef5036b7, type: 2}
     finMaterial: {fileID: 2100000, guid: 2b6ecb684e9b6684c9fc5c6b1709404d, type: 2}
   - key: discus-1
     body: {fileID: 4300000, guid: 68e07a3febff85e4fbcc09794b3b3839, type: 2}
     fins: {fileID: 4300000, guid: b0672998758162d408cee0000d827ada, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: 21654e82645e0bf46a0be1ce4bbb7552, type: 2}
+    - {fileID: 4300000, guid: db14ad899a91a6b498ccc91fac9f0ace, type: 2}
     bodyMaterial: {fileID: 2100000, guid: fc232ce64b767ae428c26e2dae1e6534, type: 2}
     finMaterial: {fileID: 2100000, guid: 1b875677f81859348839117297347372, type: 2}
   - key: barb
     body: {fileID: 4300000, guid: 5e11866b65c314e4996d4eeebb79f783, type: 2}
     fins: {fileID: 4300000, guid: 7545df99e9f8c0d4e91e4da3cd5f0f60, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: d2698882506ddf44097d15e825bf1ee2, type: 2}
+    - {fileID: 4300000, guid: 4112d42d14b56444bbe7f3480fffcd86, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 1567e9366522096438492b93581905d9, type: 2}
     finMaterial: {fileID: 2100000, guid: e93b3fe5f74ffbe4d814bc5be6da00d7, type: 2}
   - key: betta
     body: {fileID: 4300000, guid: 0312c7cfdf317a14d9243323d674443a, type: 2}
     fins: {fileID: 4300000, guid: 58e9566b886963b44b9575bdcc5a7772, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: 513b11e1c5a9edf48b8e4b89462e5783, type: 2}
+    - {fileID: 4300000, guid: 0402a70b8c86cc144b3a496df91cca9f, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 3e35674e0466ae244a1ae8b1f2c13636, type: 2}
     finMaterial: {fileID: 2100000, guid: fdb527acda5896c4a85fe90a6469835d, type: 2}
   - key: rainbow
     body: {fileID: 4300000, guid: ec5fc6a959ffd62438d2b46664fef84a, type: 2}
     fins: {fileID: 4300000, guid: 7f6170c11038125438c5bdd473129bf6, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: 2f79464767241f24d8867505dab3adda, type: 2}
+    - {fileID: 4300000, guid: 6f2b9a1cb9845f44cbb9fdc5a2d48741, type: 2}
     bodyMaterial: {fileID: 2100000, guid: dc255fdf8cb98b14dabab9173977e55b, type: 2}
     finMaterial: {fileID: 2100000, guid: ead971600d440bd42a7e25286c814df1, type: 2}
   - key: moonfish
     body: {fileID: 4300000, guid: 2a7cae547e89a07419973dce91691490, type: 2}
     fins: {fileID: 4300000, guid: 56fcd891b3b458c4388e0e7ae3fa1d3d, type: 2}
+    bodyLods:
+    - {fileID: 4300000, guid: 2aec6d78ea5bb0545a334ba73b739682, type: 2}
+    - {fileID: 4300000, guid: 7531e163c79e6484eaba52587fb287bc, type: 2}
     bodyMaterial: {fileID: 2100000, guid: ab444d3142cbfa349b02eb57f5b1c897, type: 2}
     finMaterial: {fileID: 2100000, guid: fad1ffbe1d0cdac49b73c3b2ad97a17c, type: 2}
