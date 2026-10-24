@@ -49,3 +49,15 @@ namespace Aquarium.EditorTools
         }
     }
 }
+namespace Aquarium.EditorTools
+{
+    public static partial class Dev
+    {
+        /// <summary>The graphics cards Windows can start the aquarium on (as the settings list them).</summary>
+        public static void GpuCards()
+        {
+            foreach (var c in Aquarium.App.GpuChoice.Cards()) UnityEngine.Debug.Log($"GPU card: {c.name} (GpuPreference={c.preference}, {c.vendorId:x4}:{c.deviceId:x4})");
+            UnityEngine.Debug.Log($"GPU drawing now: {Aquarium.App.GpuChoice.Current}");
+        }
+    }
+}

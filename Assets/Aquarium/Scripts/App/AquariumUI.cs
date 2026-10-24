@@ -451,8 +451,23 @@ namespace Aquarium.App
             Range(view, "Яркость", 0.6f, 1.6f, shell.day.exposureMul, v => $"{Mathf.RoundToInt(v * 100)}%", v => shell.SetPref("exposure", v));
             Check(view, "Показывать FPS и видеокарту", Prefs.Get("fps", 1f) > 0.5f, v => shell.SetPref("fps", v ? 1 : 0));
             L("ВИДЕОКАРТА", "sect", view);
-            L($"Сейчас рисует: {SystemInfo.graphicsDeviceName} ({SystemInfo.graphicsDeviceType}, {SystemInfo.graphicsMemorySize} МБ)", "tip", view);
-            L("Приложение само выбирает мощную видеокарту, если она есть. Если ноутбук всё же запускает его на встроенной: Параметры Windows → Система → Дисплей → Графика → «Живой аквариум» → «Высокая производительность».", "tip", view);
+            L($"Сейчас рисует: {GpuChoice.Current}", "tip", view);
+            var cards = GpuChoice.Cards();
+            if (GpuChoice.CanChoose && cards.Count > 1)
+            {
+                // the cards Windows can start the aquarium on, by name; the choice is Windows' own setting for this program
+                int saved = GpuChoice.Saved();
+                var options = cards.Select(c => (c.preference.ToString(), c.name)).Prepend(("0", "Как решит Windows")).ToArray();
+                Button restart = null;
+                Choice(view, "Рисовать на", options, options.Any(o => o.Item1 == saved.ToString()) ? saved.ToString() : "0", v =>
+                {
+                    GpuChoice.Choose(int.Parse(v));
+                    restart.style.display = DisplayStyle.Flex;
+                    Hint("Видеокарта выбирается при запуске — перезапустите аквариум");
+                });
+                restart = B("Перезапустить аквариум", "wide", () => { Eco.Save(); GpuChoice.Restart(); }, view);
+                restart.style.display = DisplayStyle.None;
+            }
 
             var sound = setBodies["sound"];
             sound.Clear();

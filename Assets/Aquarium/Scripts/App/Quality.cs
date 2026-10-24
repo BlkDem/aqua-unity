@@ -32,22 +32,15 @@ namespace Aquarium.App
 
         public static string[] Names => QualitySettings.names;
 
-        /// <summary>A preset for the first start, by the graphics card (built-in graphics and phones get a lighter one).</summary>
+        /// <summary>
+        /// The preset for the first start: medium (low when drawing without a graphics card); on a
+        /// slow machine the automatic resolution, and then a lower preset, take over.
+        /// </summary>
         public static int Suggest()
         {
-            if (Application.isMobilePlatform) return 0;
             string n = SystemInfo.graphicsDeviceName ?? "";
-            if (n.Contains("Basic Render") || n.Contains("llvmpipe") || n.Contains("SwiftShader")) return 0;
-            return Integrated(n) ? 1 : 2;
-        }
-
-        /// <summary>Graphics built into the processor (shares memory, slower than a separate card).</summary>
-        public static bool Integrated(string n)
-        {
-            if (n.Contains("NVIDIA") || n.Contains("GeForce") || n.Contains("RTX") || n.Contains("Arc(TM) A") || n.Contains("Arc A")) return false;
-            if (n.Contains("Intel")) return true;
-            string[] apu = { "Radeon(TM) Graphics", "Radeon Graphics", "Vega", "880M", "890M", "780M", "760M", "740M", "680M", "660M", "610M" };
-            return apu.Any(n.Contains) || SystemInfo.graphicsMemorySize < 1500;
+            bool software = n.Contains("Basic Render") || n.Contains("llvmpipe") || n.Contains("SwiftShader");
+            return software ? 0 : 1;
         }
 
         public void Apply(int level)

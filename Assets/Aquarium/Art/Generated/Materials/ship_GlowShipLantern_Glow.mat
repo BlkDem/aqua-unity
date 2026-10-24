@@ -55,6 +55,6 @@ Material:
     - _VertexColor: 0
     m_Colors:
     - _BaseColor: {r: 1, g: 0.8279951, b: 0.54591507, a: 1}
-    - _EmissionColor: {r: 0.12705536, g: 0.0561995, b: 0.008354383, a: 0.12705536}
+    - _EmissionColor: {r: 0.1272178, g: 0.05627135, b: 0.008365064, a: 0.1272178}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
