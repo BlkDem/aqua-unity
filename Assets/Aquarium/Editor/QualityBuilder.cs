@@ -67,8 +67,9 @@ namespace Aquarium.EditorTools
                 Set("m_ShadowDistance", p => p.floatValue = q.shadowDistance);
                 Set("m_SoftShadowsSupported", p => p.boolValue = q.softShadows);
                 Set("m_SoftShadowQuality", p => p.intValue = q.softQuality);
-                // upscaling from a lower render scale: bilinear is soft, FSR keeps edges
-                Set("m_UpscalingFilter", p => p.intValue = q.renderScale < 1 ? 3 : 0);
+                // upscaling from a lower render scale: bilinear (FSR — which "auto" may pick — has no shader in browsers,
+                // and without it the post-processing would stop)
+                Set("m_UpscalingFilter", p => p.intValue = 1);
                 Set("m_UseSRPBatcher", p => p.boolValue = true);
                 // no shader reads the scene's depth or colour; asking for them costs a depth pre-pass
                 // with MSAA (every opaque drawn twice). Depth of field gets its depth by itself.

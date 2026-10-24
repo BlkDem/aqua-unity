@@ -2,7 +2,8 @@
 // water murmur and the filter's trickle and hum, slow pad chords in a major pentatonic,
 // soft bells, bubbles; a knock on the glass, sprinkled food and the chime of rare events.
 // Everything is generated on the audio thread (OnAudioFilterRead); the main thread only
-// sends requests (a knock, a pop) and settings (volumes, night).
+// sends requests (a knock, a pop) and settings (volumes, night). Browsers do not run
+// OnAudioFilterRead: the web build plays the web version's own synth (Plugins/WebGL/AquaWeb.jslib).
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -25,6 +26,19 @@ namespace Aquarium.App
         readonly List<Action> requests = new List<Action>();
         float lastPop;
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+        [System.Runtime.InteropServices.DllImport("__Internal")] static extern void AqAudioInit();
+        [System.Runtime.InteropServices.DllImport("__Internal")] static extern void AqAudioCall(string what, float x);
+        [System.Runtime.InteropServices.DllImport("__Internal")] static extern void AqAudioSet(string what, float v);
+        const bool Web = true;
+#else
+        static void AqAudioInit() { }
+        static void AqAudioCall(string what, float x) { }
+        static void AqAudioSet(string what, float v) { }
+        const bool Web = false;
+#endif
+        float sentMaster = -1, sentMusic = -1, sentFx = -1, sentNight = -1;
+
         void Send(Action a) { lock (gate) requests.Add(a); }
 
         /// <summary>A bubble bursting at the surface at x (web coordinates), now and then.</summary>
@@ -32,22 +46,27 @@ namespace Aquarium.App
         {
             if (Time.unscaledTime - lastPop < 0.09f) return;
             lastPop = Time.unscaledTime;
+            if (Web) { AqAudioCall("pop", x); return; }
             float pan = Mathf.Clamp(x / 6, -1, 1);
             Send(() => Bubble(0.02f + Rand() * 0.02f, pan, Rand() * 0.5f, 0));
         }
 
-        public void Tap() => Send(() =>
+        public void Tap() { if (Web) AqAudioCall("tap", 0); else TapHere(); }
+
+        void TapHere() => Send(() =>
         {
             AddNoise(0.35f, 0.08f, 1800, 3);
             Add(new Voice { wave = Wave.Sine, f0 = 220, f1 = 120, glide = 0.12f, peak = 0.25f, attack = 0.0001f, end = 0.15f, fx = true, panL = 0.707f, panR = 0.707f });
         });
 
-        public void Sprinkle() => Send(() =>
+        public void Sprinkle() { if (Web) AqAudioCall("sprinkle", 0); else SprinkleHere(); }
+
+        void SprinkleHere() => Send(() =>
         {
             for (int i = 0; i < 10; i++) Bubble(0.03f, Rand() * 2 - 1, 0.1f + Rand() * 0.3f, i * 0.07f + Rand() * 0.06f);
         });
 
-        public void Chime() => Send(() => { Bell(0); Bell(0.15); Bell(0.3); });
+        public void Chime() { if (Web) AqAudioCall("chime", 0); else Send(() => { Bell(0); Bell(0.15); Bell(0.3); }); }
 
         // ---------------------------------------------------------------- the synth (audio thread)
         enum Wave { Sine, Triangle }
@@ -168,6 +187,7 @@ namespace Aquarium.App
 
         void Start()
         {
+            if (Web) { AqAudioInit(); return; }
             sr = AudioSettings.outputSampleRate;
             reverb = new Reverb(sr);
             trickleBp.BandPass(2600, 0.8, sr);
@@ -180,6 +200,15 @@ namespace Aquarium.App
 
         void Update()
         {
+            if (Web)
+            {
+                void Push(string k, float v, ref float sent) { if (Mathf.Abs(v - sent) > 0.001f) { sent = v; AqAudioSet(k, v); } }
+                Push("master", master, ref sentMaster);
+                Push("music", music, ref sentMusic);
+                Push("fx", fx, ref sentFx);
+                Push("night", night, ref sentNight);
+                return;
+            }
             nightA = night;
             musicA = music;
             fxA = fx;

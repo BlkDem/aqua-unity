@@ -132,6 +132,7 @@ namespace Aquarium.App
 
         public void ToggleFullScreen()
         {
+            if (Application.platform == RuntimePlatform.WebGLPlayer) { Screen.fullScreen = !Screen.fullScreen; return; }
             if (Screen.fullScreen) Screen.fullScreenMode = FullScreenMode.Windowed;
             else
             {
@@ -181,7 +182,38 @@ namespace Aquarium.App
         public string SaveBackup()
         {
             Eco.Save();
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // in a browser the copy is a downloaded file
+            string name = $"аквариум-{DateTime.Now:yyyy-MM-dd}.json";
+            AqDownload(name, app.World.ToJson());
+            return name;
+#else
             return Backup.Save(app.World.ToJson());
+#endif
+        }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        [System.Runtime.InteropServices.DllImport("__Internal")] static extern void AqDownload(string name, string text);
+        [System.Runtime.InteropServices.DllImport("__Internal")] static extern void AqPickFile(string target, string method);
+#endif
+
+        /// <summary>A browser's file dialog for a saved copy (the answer comes to OnBackupPicked).</summary>
+        public void PickBackup()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            AqPickFile(gameObject.name, nameof(OnBackupPicked));
+#endif
+        }
+
+        public void OnBackupPicked(string json)
+        {
+            var st = Aquarium.Life.World.Parse(json);
+            if (st == null || st.Fish.Count == 0) { ui.Hint("Это не копия аквариума"); return; }
+            ui.ConfirmReplace($"копией из файла ({Aquarium.Life.Words.FishWord(st.Fish.Count)})", () =>
+            {
+                if (!app.World.Import(json)) { ui.Hint("Не получилось загрузить копию"); return; }
+                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            });
         }
 
         /// <summary>Replace the aquarium with a saved copy and start again with it.</summary>

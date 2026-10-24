@@ -81,6 +81,14 @@ Assets/Settings/     URP: профили качества PC/Mobile, Volume
 
 Код выхода 0 — все тесты прошли; подробности в `Logs/editmode.xml`.
 
+## Веб-версия (aqua3d.umolab.ru)
+
+- Сборка: **Aquarium → Build Web Player** или `-buildTarget WebGL -executeMethod Aquarium.EditorTools.PlayerBuild.Web` → `Builds/Web` (WebGL 2, gzip с распаковкой в браузере — сервер настраивать не нужно; страница — `Assets/WebGLTemplates/Aquarium`).
+- В браузере звук — синтезатор веб-версии через `Plugins/WebGL/AquaWeb.jslib` (`OnAudioFilterRead` там не работает), мир хранится в IndexedDB, резервная копия скачивается файлом и загружается через выбор файла.
+- Выкладка с компьютера: `Tools/deploy-web.sh` (rsync в папку сайта).
+- Из CI: тег `web-*` (или `v*`), либо Actions → CI → Run workflow с галочкой web. Нужен секрет `DEPLOY_SSH_KEY_3D` — ключ, который на сервере в `authorized_keys` пользователя user1 ограничен так:
+  `command="/usr/bin/rrsync /var/www/fastuser/data/www/aqua3d.umolab.ru",restrict ssh-ed25519 AAAA… github-actions aqua3d deploy`
+
 ## CI
 
 `.github/workflows/ci.yml` (GameCI): на каждый пуш — EditMode-тесты (без LFS-моделей, они тестам не нужны); сборка под Windows (артефакт `Aquarium-Windows`) — на теги `v*` и по кнопке Run workflow. Так экономится LFS-трафик: у бесплатного GitHub это 1 ГБ в месяц, а модели весят ~180 МБ. Нужны секреты репозитория — учётная запись Unity, на которой активирована лицензия Personal:

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#06344d">
+  <meta name="description" content="Маленький подводный мир, который живёт своей жизнью">
+  <title>{{{ PRODUCT_NAME }}}</title>
+  <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #05070c; color: #eaf7ff; font-family: system-ui, sans-serif; }
+    #unity-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; background: #05070c; outline: none; }
+    #loader { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, #0c3550 0%, #04121d 55%, #020509 100%); transition: opacity 1.6s ease; }
+    #loader.gone { opacity: 0; pointer-events: none; }
+    .t { font-size: 44px; font-weight: 800; background: linear-gradient(180deg, #e9fbff, #7fd8f0); -webkit-background-clip: text; background-clip: text; color: transparent; text-align: center; }
+    .s { margin-top: 8px; color: rgba(220, 240, 255, .62); font-size: 15px; text-align: center; }
+    .bar { width: min(320px, 70vw); height: 4px; margin: 22px auto 0; border-radius: 2px; background: rgba(190, 240, 255, .15); overflow: hidden; }
+    .bar i { display: block; height: 100%; width: 0; background: #7fe3ff; transition: width .3s; }
+    .err { margin-top: 18px; color: #ff8a6a; font-size: 14px; max-width: 80vw; text-align: center; }
+  </style>
+</head>
+<body>
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+  <div id="loader"><div><div class="t">Живой аквариум</div><div class="s">маленький подводный мир просыпается…</div><div class="bar"><i id="bar"></i></div><div class="err" id="err"></div></div></div>
+  <script>
+    const canvas = document.getElementById('unity-canvas');
+    const config = {
+      dataUrl: 'Build/{{{ DATA_FILENAME }}}',
+      frameworkUrl: 'Build/{{{ FRAMEWORK_FILENAME }}}',
+#if USE_WASM
+      codeUrl: 'Build/{{{ CODE_FILENAME }}}',
+#endif
+#if SYMBOLS_FILENAME
+      symbolsUrl: 'Build/{{{ SYMBOLS_FILENAME }}}',
+#endif
+      streamingAssetsUrl: 'StreamingAssets',
+      companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+      productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+      productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+      devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+    };
+    const script = document.createElement('script');
+    script.src = 'Build/{{{ LOADER_FILENAME }}}';
+    script.onload = () => {
+      createUnityInstance(canvas, config, (p) => { document.getElementById('bar').style.width = Math.round(p * 100) + '%'; })
+        .then(() => { document.getElementById('loader').classList.add('gone'); canvas.focus(); })
+        .catch((e) => { document.getElementById('err').textContent = 'Не получилось запустить аквариум: ' + e; });
+    };
+    document.body.appendChild(script);
+  </script>
+</body>
+</html>

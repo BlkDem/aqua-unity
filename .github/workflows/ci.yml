@@ -1,6 +1,9 @@
 # Tests on every push (without the LFS models: tests do not need them, and GitHub's free LFS
-# bandwidth is 1 GB a month); a Windows build for release tags (v*) or on demand. GameCI.
-# Secrets: UNITY_EMAIL, UNITY_PASSWORD — a Unity Personal seat (see README).
+# bandwidth is 1 GB a month); builds only for tags or on demand (each pulls ~400 MB of LFS):
+#   v*    — Windows build (artifact) and the web build published to aqua3d.umolab.ru
+#   web-* — only the web build, published
+# Secrets: UNITY_EMAIL, UNITY_PASSWORD — a Unity Personal seat (see README);
+#          DEPLOY_SSH_KEY_3D — a key that the server locks to rrsync into the aqua3d site.
 name: CI
 
 on:
@@ -8,7 +11,11 @@ on:
   workflow_dispatch:
     inputs:
       build:
-        description: Also build for Windows
+        description: Build for Windows
+        type: boolean
+        default: false
+      web:
+        description: Build for the web and publish to aqua3d.umolab.ru
         type: boolean
         default: true
 
@@ -56,3 +63,71 @@ jobs:
         with:
           name: Aquarium-Windows
           path: build/StandaloneWindows64
+
+  web:
+    if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/web-') || inputs.web
+    needs: test
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-aqua3d
+      cancel-in-progress: false
+    environment:
+      name: aqua3d
+      url: https://aqua3d.umolab.ru
+    env:
+      DEPLOY_HOST: fp.cloud28.umolab.ru
+      DEPLOY_USER: user1
+      # the server's host key, so the connection is verified rather than trusted blindly
+      DEPLOY_KNOWN_HOST: fp.cloud28.umolab.ru ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJQ6hyB82DkzAvctVL9RouICN0e2mbVXLuVQfb22TrJL
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: true
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-Web-${{ hashFiles('Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: Library-Web-
+      - uses: game-ci/unity-builder@v4
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: WebGL
+          # our own build method: gzip with decompression in the browser, our page template
+          buildMethod: Aquarium.EditorTools.PlayerBuild.Web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Aquarium-Web
+          path: Builds/Web
+
+      - name: Prepare the deploy key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY_3D }}
+        run: |
+          if [ -z "$DEPLOY_SSH_KEY" ]; then
+            echo "::error title=No deploy key::The repository secret DEPLOY_SSH_KEY_3D is not set (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if ! ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null 2> keyerr.txt; then
+            echo "::error title=Bad deploy key::DEPLOY_SSH_KEY_3D is not a valid private key: $(head -c 200 keyerr.txt)"
+            exit 1
+          fi
+          printf '%s\n' "$DEPLOY_KNOWN_HOST" > ~/.ssh/known_hosts
+
+      - name: Upload to the server
+        run: |
+          # the key is locked to the site directory on the server (rrsync), so the target is "./"
+          set +e
+          rsync -rz --delete --omit-dir-times --chmod=D2775,F664 \
+            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20" \
+            Builds/Web/ "$DEPLOY_USER@$DEPLOY_HOST:./" 2> rsync.err
+          code=$?
+          if [ $code -ne 0 ]; then
+            echo "::error title=Upload failed (rsync $code)::$(tr '\n' ' ' < rsync.err | head -c 400)"
+            exit 1
+          fi
+          echo "::notice title=Published::https://aqua3d.umolab.ru"

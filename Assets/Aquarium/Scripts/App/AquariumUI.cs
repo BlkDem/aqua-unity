@@ -437,8 +437,12 @@ namespace Aquarium.App
             L("Весь аквариум — рыбки, их семьи, растения и история — в одном файле. Его можно сохранить на память или перенести на другое устройство (в том числе в веб-версию и обратно).", "tip", life);
             var bk = E("backup", life);
             B("Сохранить в файл", "wide", () => Hint($"Копия сохранена: {Path.GetFileName(shell.SaveBackup())}"), bk);
-            B("Загрузить из файла", "wide", ShowBackups, bk);
-            B("Открыть папку с копиями", "wide", () => Application.OpenURL("file:///" + Backup.Dir.Replace('\\', '/')), life);
+            if (Application.platform == RuntimePlatform.WebGLPlayer) B("Загрузить из файла", "wide", shell.PickBackup, bk);
+            else
+            {
+                B("Загрузить из файла", "wide", ShowBackups, bk);
+                B("Открыть папку с копиями", "wide", () => Application.OpenURL("file:///" + Backup.Dir.Replace('\\', '/')), life);
+            }
             L("Кликните по стеклу, чтобы постучать. Наведите на рыбку, чтобы узнать имя. В аквариуме спрятано несколько секретов…", "tip", life);
 
             var view = setBodies["view"];
@@ -617,6 +621,10 @@ namespace Aquarium.App
             var actions = E("away-actions", el);
             B("Закрыть", null, () => CloseDialog(el), actions);
         }
+
+        /// <summary>Ask before the aquarium is replaced with a copy.</summary>
+        public void ConfirmReplace(string what, Action yes) =>
+            Confirm($"Заменить нынешний аквариум {what}? Нынешний пропадёт, если его не сохранить.", yes);
 
         void Confirm(string text, Action yes)
         {
