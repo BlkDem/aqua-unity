@@ -92,7 +92,7 @@ void FishDeform(FishAttributes i, out float3 p, out float3 n)
     float4 W = UNITY_ACCESS_INSTANCED_PROP(FishProps, _Wag);
     p = i.positionOS.xyz;
     n = i.normalOS;
-#if defined(_FINS)
+    // pectorals paddle: in the fin mesh, or in the body of a sculpted model with solid fins
     if (i.pect.x != 0.0)
     {
         float3 q = p - i.pect.yzw;
@@ -104,6 +104,7 @@ void FishDeform(FishAttributes i, out float3 p, out float3 n)
         n.yz = float2(cx * n.y - sx * n.z, sx * n.y + cx * n.z);
         p = q + i.pect.yzw;
     }
+#if defined(_FINS)
     // fin atlas: left half of U = caudal fin, right half = other fins; U runs root -> tip
     float finTail = step(i.uv.x, 0.5);
     float finU = finTail > 0.5 ? i.uv.x * 2.0 : i.uv.x * 2.0 - 1.0;

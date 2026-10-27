@@ -26,7 +26,7 @@ namespace Aquarium.EditorTools
 {
     public static partial class Dev
     {
-        static long Tris(UnityEngine.Mesh m) { long n = 0; for (int i = 0; i < m.subMeshCount; i++) n += m.GetIndexCount(i) / 3; return n; }
+        static long Tris(UnityEngine.Mesh m) { long n = 0; if (!m) return 0; for (int i = 0; i < m.subMeshCount; i++) n += m.GetIndexCount(i) / 3; return n; }
 
         public static void TriangleStats()
         {

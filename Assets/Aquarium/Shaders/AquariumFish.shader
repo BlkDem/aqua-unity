@@ -1,5 +1,6 @@
 // Fish bodies and fins, drawn instanced (see AquariumFishPasses.hlsl). Fins use the _FINS
-// keyword: pectorals paddle, the fin atlas ripples, and they are transparent and two-sided.
+// keyword: the fin atlas ripples, and they are transparent and two-sided. Pectorals (uv2) paddle
+// in either mesh.
 Shader "Aquarium/Fish"
 {
     Properties

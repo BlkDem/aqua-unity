@@ -15,68 +15,68 @@ MonoBehaviour:
   models:
   - key: neon
     body: {fileID: 4300000, guid: e589bf28696826241b826821866b7325, type: 2}
-    fins: {fileID: 4300000, guid: e287509974722ad4090d5e46d14ac180, type: 2}
+    fins: {fileID: 0}
     bodyLods:
     - {fileID: 4300000, guid: 790f40e037f4b3b478020ef7e6e43b44, type: 2}
     - {fileID: 4300000, guid: c3f72a8ddd0043241aa7c73e500b00d2, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 7e8e603336c434143a779a59c5634309, type: 2}
-    finMaterial: {fileID: 2100000, guid: 586db2fceddbadc41b40452de676fe0e, type: 2}
+    finMaterial: {fileID: 0}
   - key: guppy-0
     body: {fileID: 4300000, guid: 11e77e8ddf47a284594c71abb8a84bd0, type: 2}
-    fins: {fileID: 4300000, guid: 5f62077143df1054fb9a7b2293ac63e9, type: 2}
+    fins: {fileID: 0}
     bodyLods:
     - {fileID: 4300000, guid: faeb9603d500301489d495c712956514, type: 2}
     - {fileID: 4300000, guid: b408ad7d6c505e6458675899537bb593, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 467d5f1f52a1da847a47bae14788cebf, type: 2}
-    finMaterial: {fileID: 2100000, guid: f0687806c279679498fdd2c7449734ec, type: 2}
+    finMaterial: {fileID: 0}
   - key: guppy-1
     body: {fileID: 4300000, guid: de06efdd705b0d642a07802e8f234211, type: 2}
-    fins: {fileID: 4300000, guid: a56a681e007fd5a46be168d02d6aa2af, type: 2}
+    fins: {fileID: 0}
     bodyLods:
     - {fileID: 4300000, guid: 254a87944179cd744a59da8e9636b7d3, type: 2}
     - {fileID: 4300000, guid: d06c9dfcb438dda4496f61356d738bb2, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 5944d3fa19d923b44b02f1fbfa5f7bdc, type: 2}
-    finMaterial: {fileID: 2100000, guid: 30f3020de032b004f96e1ffb171b3e48, type: 2}
+    finMaterial: {fileID: 0}
   - key: guppy-2
     body: {fileID: 4300000, guid: 07241bb284ccc8d428fae78d6459e070, type: 2}
-    fins: {fileID: 4300000, guid: a3ca339fc86f70d4e8b93a2f2835dbe8, type: 2}
+    fins: {fileID: 0}
     bodyLods:
     - {fileID: 4300000, guid: 3e1f24dd9bd7add4fa5bc5f808523510, type: 2}
     - {fileID: 4300000, guid: ca8dc32b9d677de44af0c1eeacb5e607, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 5f665c3aeb19c6c4a89074de3695f88f, type: 2}
-    finMaterial: {fileID: 2100000, guid: eba92aca474be7d44811006a6403d7d8, type: 2}
+    finMaterial: {fileID: 0}
   - key: guppy-3
     body: {fileID: 4300000, guid: 9c17749d99d793342a05eb4e683c8b55, type: 2}
-    fins: {fileID: 4300000, guid: 69fc9363f3ab08b439d3d4d0450598f2, type: 2}
+    fins: {fileID: 0}
     bodyLods:
     - {fileID: 4300000, guid: 8ff5f33786a82354884510b6d108451c, type: 2}
     - {fileID: 4300000, guid: e59fd29e9d2dc524483d91bced770f48, type: 2}
     bodyMaterial: {fileID: 2100000, guid: ecfef8f6b78bcbf4d9360adf3ee040fe, type: 2}
-    finMaterial: {fileID: 2100000, guid: 60760e87d04c7364ba76ab46a59b8eb5, type: 2}
+    finMaterial: {fileID: 0}
   - key: guppy-4
     body: {fileID: 4300000, guid: aed4a591b8f75b343a8794be455c3e99, type: 2}
-    fins: {fileID: 4300000, guid: cb94ad084cc7bb84f826305e98243460, type: 2}
+    fins: {fileID: 0}
     bodyLods:
     - {fileID: 4300000, guid: b78a175beaa156d498c37986381b5542, type: 2}
     - {fileID: 4300000, guid: 6055b43d2318def499948da49198797e, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 5244844e319201e4d92beec3a4c219b9, type: 2}
-    finMaterial: {fileID: 2100000, guid: ce761792ffc5f6b46b3b72b9f3011d5b, type: 2}
+    finMaterial: {fileID: 0}
   - key: guppy-5
     body: {fileID: 4300000, guid: 150fc0115192681488c04a852863849f, type: 2}
-    fins: {fileID: 4300000, guid: fcb46ffdcab558046a0d121e8c102858, type: 2}
+    fins: {fileID: 0}
     bodyLods:
     - {fileID: 4300000, guid: b4097e984cad5df4480ff44443770e4c, type: 2}
     - {fileID: 4300000, guid: 47adb74133f2ede41bc2cebb5fafca47, type: 2}
     bodyMaterial: {fileID: 2100000, guid: fe0fb870e817475418913bd21c4fdd6f, type: 2}
-    finMaterial: {fileID: 2100000, guid: 2cfd5bec377dc3345954805cc7d3a355, type: 2}
+    finMaterial: {fileID: 0}
   - key: guppy-6
     body: {fileID: 4300000, guid: 4a314c677c2dfc347802d96f57b4168b, type: 2}
-    fins: {fileID: 4300000, guid: 3786fd4e51f3b4945aa6afe7474ff33a, type: 2}
+    fins: {fileID: 0}
     bodyLods:
     - {fileID: 4300000, guid: f5a20dfd010da054f80349502092fea0, type: 2}
     - {fileID: 4300000, guid: a92fae60e85309f4097abd5b7fcbfbd6, type: 2}
     bodyMaterial: {fileID: 2100000, guid: 277d47997b950134392c416f823fe336, type: 2}
-    finMaterial: {fileID: 2100000, guid: 364890ccfce35324e80c88fa8f99c6c2, type: 2}
+    finMaterial: {fileID: 0}
   - key: goldfish
     body: {fileID: 4300000, guid: 5bf55c3d8e6bf43499f99dd3812e078e, type: 2}
     fins: {fileID: 4300000, guid: d50c225f6d1c250409ae6acc161e1347, type: 2}
@@ -95,12 +95,12 @@ MonoBehaviour:
     finMaterial: {fileID: 2100000, guid: 29782d77ab4614e41ab562f2a8e20cdb, type: 2}
   - key: clown
     body: {fileID: 4300000, guid: 7a0e4357ef26459418b4e25bb2f4b5df, type: 2}
-    fins: {fileID: 4300000, guid: 36376e31a2ca5684baa2f353f2b4a716, type: 2}
+    fins: {fileID: 0}
     bodyLods:
     - {fileID: 4300000, guid: 57d548f80726a11469e4135b8a1051f3, type: 2}
     - {fileID: 4300000, guid: 0ebf7fbaf1db7a84286e7de082e5e8f6, type: 2}
     bodyMaterial: {fileID: 2100000, guid: c4966212b83ef9447aac6a925d9dddf9, type: 2}
-    finMaterial: {fileID: 2100000, guid: 439807cb2e3076c4b91ee93b599da1fa, type: 2}
+    finMaterial: {fileID: 0}
   - key: cory
     body: {fileID: 4300000, guid: dd58178231cc61b49a159976c219e923, type: 2}
     fins: {fileID: 4300000, guid: 81b794232152a0843b8b6f1027317d05, type: 2}

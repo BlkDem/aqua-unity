@@ -87,7 +87,7 @@ namespace Aquarium.Fish
                 if (b.fish[0].sp.glow)
                 {
                     b.model.bodyMaterial.SetFloat(GlowId, 0.15f + night * 0.9f);
-                    b.model.finMaterial.SetFloat(GlowId, 0.15f + night * 0.9f);
+                    if (b.model.finMaterial) b.model.finMaterial.SetFloat(GlowId, 0.15f + night * 0.9f);
                 }
                 for (int li = 0; li < 3; li++)
                 {
@@ -105,6 +105,7 @@ namespace Aquarium.Fish
                         var shadow = new RenderParams(b.model.bodyMaterial) { matProps = l.props, shadowCastingMode = ShadowCastingMode.ShadowsOnly, worldBounds = TankBounds, camera = only };
                         Graphics.RenderMeshInstanced(shadow, b.model.bodyLods[1], 0, l.matrices, l.n);
                     }
+                    if (!b.model.fins) continue;   // a sculpted model: its fins are part of the body
                     var fins = new RenderParams(b.model.finMaterial) { matProps = l.props, shadowCastingMode = ShadowCastingMode.Off, receiveShadows = true, worldBounds = TankBounds, camera = only };
                     Graphics.RenderMeshInstanced(fins, b.model.fins, 0, l.matrices, l.n);
                 }

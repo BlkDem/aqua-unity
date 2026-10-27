@@ -116,7 +116,7 @@ namespace Aquarium.EditorTools
                     props.SetVectorArray("_Tint", new[] { Vector4.one });
                     var mat = new[] { Matrix4x4.TRS(at, Quaternion.identity, Vector3.one) };
                     Graphics.RenderMeshInstanced(new RenderParams(m.bodyMaterial) { matProps = props }, m.body, 0, mat, 1);
-                    Graphics.RenderMeshInstanced(new RenderParams(m.finMaterial) { matProps = props }, m.fins, 0, mat, 1);
+                    if (m.fins) Graphics.RenderMeshInstanced(new RenderParams(m.finMaterial) { matProps = props }, m.fins, 0, mat, 1);
                     cam.transform.position = at + offset;
                     cam.transform.LookAt(at);
                     Save(cam, $"Logs/rest/{key}-{tag}-{view}.png", 400, 300);
@@ -166,7 +166,7 @@ namespace Aquarium.EditorTools
                 var pos = new Vector3(-f.pos.x, f.pos.y, f.pos.z);
                 var rot = Aquarium.Fish.FishRenderer.ToUnity(f.rotation);
                 Add(m.body, m.bodyMaterial, pos, rot, f.scaleXYZ, props);
-                Add(m.fins, m.finMaterial, pos, rot, f.scaleXYZ, props);
+                if (m.fins) Add(m.fins, m.finMaterial, pos, rot, f.scaleXYZ, props);
             }
             if (eco.plants != null)
                 foreach (var (mesh, sub, mat, m) in eco.plants.Instances())

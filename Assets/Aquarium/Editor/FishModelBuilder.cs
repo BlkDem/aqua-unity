@@ -1,8 +1,10 @@
 // Prepares the fish models for instanced drawing (the web version's fishAssets.js + FishBatch):
 // the body with cartoon-but-natural eyes (iris ball, big pupil, a glint) painted on a white
 // texel block of the body texture, and the fins with the pectorals' pivots stored per vertex
-// (uv2: paddle direction, pivot) so the shader can paddle them. Saved as assets in
-// Assets/Aquarium/Art/Generated/Fish and listed in FishModels.asset.
+// (uv2: paddle direction, pivot) so the shader can paddle them. A sculpted model (no Fins node,
+// e.g. the clownfish from Tripo) keeps its own eyes and solid fins: its pectorals paddle as part
+// of the body and there is no fin mesh. Saved as assets in Assets/Aquarium/Art/Generated/Fish and
+// listed in FishModels.asset.
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -40,7 +42,7 @@ namespace Aquarium.EditorTools
             return set;
         }
 
-        static Transform Node(Transform root, string name) => root.GetComponentsInChildren<Transform>().First(t => t.name == name);
+        static Transform Node(Transform root, string name) => root.GetComponentsInChildren<Transform>().FirstOrDefault(t => t.name == name);
 
         /// <summary>A node's mesh with its transform relative to the model root baked in.</summary>
         static Mesh Baked(Transform root, Transform node)
@@ -91,7 +93,7 @@ namespace Aquarium.EditorTools
             var parts = new List<(Mesh, Color, Vector4, bool)> { (Baked(root, Node(root, "Body")), Color.white, Vector4.zero, false) };
             // natural eyes: coloured iris ball, big dark pupil, small specular glint
             ColorUtility.TryParseHtmlString(sp.iris, out var iris);
-            foreach (var eyeName in new[] { "EyeL", "EyeR" })
+            foreach (var eyeName in Node(root, "EyeL") ? new[] { "EyeL", "EyeR" } : new string[0])
             {
                 var e = Baked(root, Node(root, eyeName));
                 e.RecalculateBounds();
@@ -101,21 +103,20 @@ namespace Aquarium.EditorTools
                 parts.Add((Sphere(r * 0.62f, 14, 10, pos + new Vector3(s * r * 0.48f, 0, r * 0.05f)), new Color(0.003f, 0.003f, 0.003f), Vector4.zero, true));
                 parts.Add((Sphere(r * 0.13f, 6, 4, pos + new Vector3(s * r * 0.98f, r * 0.32f, r * 0.28f)), Color.white, Vector4.zero, true));
             }
-            var body = Save(Combine(parts, $"{key}_body"));
-
-            // fins: fixed fins + pectorals paddled around their pivots. The model is mirrored on the
-            // way into Unity (glTFast), so the paddle direction is too: the left fin (web -1) is +1 here.
-            var finParts = new List<(Mesh, Color, Vector4, bool)> { (Baked(root, Node(root, "Fins")), Color.white, Vector4.zero, false) };
+            // pectorals paddled around their pivots. The model is mirrored on the way into Unity
+            // (glTFast), so the paddle direction is too: the left fin (web -1) is +1 here.
+            var pects = new List<(Mesh, Color, Vector4, bool)>();
             foreach (var (pectName, side) in new[] { ("PectL", 1f), ("PectR", -1f) })
             {
                 var node = Node(root, pectName);
                 var pivot = root.InverseTransformPoint(node.position);
-                finParts.Add((Baked(root, node), Color.white, new Vector4(side, pivot.x, pivot.y, pivot.z), false));
+                pects.Add((Baked(root, node), Color.white, new Vector4(side, pivot.x, pivot.y, pivot.z), false));
             }
-            var fins = Save(Combine(finParts, $"{key}_fins"));
+            var finNode = Node(root, "Fins");
+            if (!finNode) parts.AddRange(pects);
+            var body = Save(Combine(parts, $"{key}_body"));
 
             var srcBody = Node(root, "Body").GetComponent<MeshRenderer>().sharedMaterial;
-            var srcFin = Node(root, "Fins").GetComponent<MeshRenderer>().sharedMaterial;
             var shader = Shader.Find("Aquarium/Fish");
             var bm = new Material(shader) { enableInstancing = true };
             bm.SetTexture("_BaseMap", TextureStore.Get(srcBody.GetTexture("baseColorTexture"), TexKind.Color));
@@ -126,6 +127,19 @@ namespace Aquarium.EditorTools
             bm.SetFloat("_Metallic", 0.05f);
             bm.SetFloat("_CausticStrength", 0.55f);
             if (sp.glow) bm.SetColor("_EmissionColor", WebHex("#8fe9ff") * 0.4f);
+            var model = new FishModel { key = key, body = body, bodyLods = Lods(body), bodyMaterial = SaveMat(bm, $"{key}_body") };
+            if (!finNode)
+            {
+                AssetDatabase.DeleteAsset($"{Dir}/{key}_fins.asset");
+                AssetDatabase.DeleteAsset($"{Dir}/{key}_fins.mat");
+                return model;
+            }
+
+            // fins: fixed fins + the pectorals
+            var finParts = new List<(Mesh, Color, Vector4, bool)> { (Baked(root, finNode), Color.white, Vector4.zero, false) };
+            finParts.AddRange(pects);
+            model.fins = Save(Combine(finParts, $"{key}_fins"));
+            var srcFin = finNode.GetComponent<MeshRenderer>().sharedMaterial;
             var fm = new Material(shader) { enableInstancing = true };
             fm.SetTexture("_BaseMap", TextureStore.Get(srcFin.GetTexture("baseColorTexture"), TexKind.Color));
             fm.SetFloat("_Fins", 1);
@@ -140,7 +154,8 @@ namespace Aquarium.EditorTools
             fm.renderQueue = 3000;
             fm.SetOverrideTag("RenderType", "Transparent");
             if (sp.glow) fm.SetColor("_EmissionColor", WebHex("#8fb6ff") * 0.6f);
-            return new FishModel { key = key, body = body, fins = fins, bodyLods = Lods(body), bodyMaterial = SaveMat(bm, $"{key}_body"), finMaterial = SaveMat(fm, $"{key}_fins") };
+            model.finMaterial = SaveMat(fm, $"{key}_fins");
+            return model;
         }
 
         static Color WebHex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c; }
