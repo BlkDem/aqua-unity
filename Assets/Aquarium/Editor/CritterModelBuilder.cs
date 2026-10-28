@@ -15,6 +15,7 @@ namespace Aquarium.EditorTools
     {
         const string Dir = "Assets/Aquarium/Art/Generated/Critters";
         const string SetPath = Dir + "/CritterModels.asset";
+        const string SkinDir = "Assets/Aquarium/Art/Textures/Critters/shrimp/skins";
 
         [MenuItem("Aquarium/Build Critter Models")]
         public static CritterModelSet Build()
@@ -24,6 +25,10 @@ namespace Aquarium.EditorTools
             if (!set) { set = ScriptableObject.CreateInstance<CritterModelSet>(); AssetDatabase.CreateAsset(set, SetPath); }
             set.crab = Prefab("crab", 0.9f);
             set.shrimp = Prefab("shrimp", 1.0f);
+            // recoloured patterns for the sculpted shrimp (the web version's tools/import_critter.py --skins)
+            var skins = Directory.Exists(SkinDir) ? Directory.GetFiles(SkinDir, "shrimp_*.jpg").OrderBy(f => f).ToArray() : new string[0];
+            set.shrimpSkinKeys = skins.Select(f => Path.GetFileNameWithoutExtension(f).Substring("shrimp_".Length)).ToArray();
+            set.shrimpSkins = skins.Select(f => AssetDatabase.LoadAssetAtPath<Texture2D>(f.Replace('\\', '/'))).ToArray();
             set.snailMystery = Prefab("snail-mystery", 0.8f);
             set.snailNerite = Prefab("snail-nerite", 0.8f);
             set.snailRamshorn = Prefab("snail-ramshorn", 0.8f);

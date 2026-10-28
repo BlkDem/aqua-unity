@@ -103,15 +103,22 @@ namespace Aquarium.Fish
         readonly (Joint j, float side, int i)[] legs;
         readonly Joint[] claws;
 
-        public Shrimp(Ecosystem eco, GameObject prefab, Transform parent, Color color, string name) : base(eco, prefab, parent, name)
+        public Shrimp(Ecosystem eco, GameObject prefab, Transform parent, Color color, string name, Texture2D skin = null) : base(eco, prefab, parent, name)
         {
             kind = "shrimp";
             title = "Креветка";
             inner = root.GetChild(0);
-            // the shell, legs and whiskers all take the shrimp's colour (cherry, blue, yellow...)
+            // the shell, legs and whiskers all take the shrimp's colour (cherry, blue, yellow...): a
+            // sculpted shrimp its pattern recoloured, a plain one tinted
             foreach (var r in root.GetComponentsInChildren<Renderer>())
             {
-                var mats = r.sharedMaterials.Select(m => { var c = new Material(m); c.SetColor("_BaseColor", color); return c; }).ToArray();
+                var mats = r.sharedMaterials.Select(m =>
+                {
+                    var c = new Material(m);
+                    if (skin) { c.SetTexture("_BaseMap", skin); c.SetColor("_BaseColor", Color.white); }
+                    else c.SetColor("_BaseColor", color);
+                    return c;
+                }).ToArray();
                 r.sharedMaterials = mats;
             }
             segs = Enumerable.Range(0, 6).Select(i => J($"Seg{i}")).ToArray();
@@ -602,7 +609,7 @@ namespace Aquarium.Fish
                 for (int i = 0; i < shrimpCols.Length; i++)
                 {
                     ColorUtility.TryParseHtmlString(shrimpCols[i], out var c);
-                    list.Add(new Shrimp(eco, set.shrimp, parent, c, shrimpNames[i]));
+                    list.Add(new Shrimp(eco, set.shrimp, parent, c, shrimpNames[i], set.ShrimpSkin(shrimpCols[i])));
                 }
             foreach (var (type, name, glass) in new[] { ("mystery", "Галя", true), ("nerite", "Зебра", true), ("ramshorn", "Завиток", false), ("nerite", "Тихоход", false), ("mystery", "Турбо", true), ("ramshorn", "Колесо", false) })
             {

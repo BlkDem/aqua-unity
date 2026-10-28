@@ -17,3 +17,21 @@ MonoBehaviour:
   snailMystery: {fileID: 8698871410583983368, guid: a4dc9b814d0148d48bfc1150567e6c99, type: 3}
   snailNerite: {fileID: 3719518831400503009, guid: 128dc5eba7b5f134fa5f5b249e02419e, type: 3}
   snailRamshorn: {fileID: 7260882486474184493, guid: 7939cb065c5ba724f93d4198f8553109, type: 3}
+  shrimpSkinKeys:
+  - 2f7dff
+  - c9d6d9
+  - e8101e
+  - ff2a2a
+  - ff2a6a
+  - ff3b30
+  - ff5a36
+  - ffd400
+  shrimpSkins:
+  - {fileID: 2800000, guid: c8d5c3a16a0bc9e4fb3c5ab5fcb3b8ec, type: 3}
+  - {fileID: 2800000, guid: 1a6f5d5f81b50d7469e29092435e95c1, type: 3}
+  - {fileID: 2800000, guid: e9f5a82b0f7e83846accb32b5378f57e, type: 3}
+  - {fileID: 2800000, guid: 44a6eb732b0d94549a25dbd0b9f7ecd6, type: 3}
+  - {fileID: 2800000, guid: 92e184971740d6c41bb965f425a0a850, type: 3}
+  - {fileID: 2800000, guid: cd921c0112e2c3b4bb7ed8181c428c89, type: 3}
+  - {fileID: 2800000, guid: 19950e6380ee2b04a8d3866c2c58cea1, type: 3}
+  - {fileID: 2800000, guid: 52d9da2d2d2cda948af3ab3870e7e6fe, type: 3}

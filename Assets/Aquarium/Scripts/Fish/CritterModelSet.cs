@@ -8,6 +8,15 @@ namespace Aquarium.Fish
     public sealed class CritterModelSet : ScriptableObject
     {
         public GameObject crab, shrimp, snailMystery, snailNerite, snailRamshorn;
+        // a sculpted shrimp's own pattern recoloured for each of the shrimp's colours (web hex, no #)
+        public string[] shrimpSkinKeys = new string[0];
+        public Texture2D[] shrimpSkins = new Texture2D[0];
+
+        public Texture2D ShrimpSkin(string hex)
+        {
+            int i = System.Array.IndexOf(shrimpSkinKeys, hex.TrimStart('#').ToLowerInvariant());
+            return i >= 0 ? shrimpSkins[i] : null;
+        }
 
         public GameObject Snail(string type) => type switch
         {
