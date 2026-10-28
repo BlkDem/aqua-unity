@@ -65,6 +65,11 @@ namespace Aquarium.Fish
 
         // motion
         public Vector3 pos, vel, heading, wantDir, goal;
+        // pressed against the decor without getting anywhere, and the way out once that has lasted
+        float boxedT, escapeT;
+        Vector3 escapeWay;
+        /// <summary>For the tools: how long it has been getting out of a nook.</summary>
+        public float Escaping => escapeT;
         public float yawRate, pitch, tail = 0.5f, pectF, pectBrake, pectS, pectB, idleScull, phase, finPhase, burstT, burst, gulp, flare, speedMul = 1;
         public Vector3? face;
 
@@ -841,7 +846,8 @@ namespace Aquarium.Fish
             }
             if (burst > 0) { burst -= dt; mul *= 1 + 0.8f * S.burst; }
             float desiredSpeed = S.cruise * mul * speedK;
-            // seek
+            // seek (a goal inside the decor is moved out to where the fish fits)
+            if (eco.field != null) goal = eco.field.Clear(goal, Girth + 0.1f);
             var a = goal - pos;
             float dist = a.magnitude;
             if (dist > 1e-4f)
@@ -884,15 +890,44 @@ namespace Aquarium.Fish
                 acc += (coh / n - pos) * (1.2f * schoolW);
                 acc += (ali / n - vel) * (1.6f * schoolW);
             }
-            // obstacles
-            foreach (var col in eco.colliders)
+            // the decor, by its real shapes: a surface ahead of the nose turns the course along it, harder
+            // the closer it is, and one close to the body pushes it off. Openings the fish fits through
+            // (an arch, the wreck's hold) stay open.
+            var field = eco.field;
+            Vector3 wall = Vector3.zero;
+            float wallK = 0;
+            if (field != null)
             {
-                float dx = pos.x - col.center.x, dy = pos.y - col.center.y, dz = pos.z - col.center.z;
-                float r = col.radius + size * 0.5f + 0.12f, d2 = dx * dx + dy * dy + dz * dz;
-                if (d2 < r * r)
+                float r = Girth, keep = 0.3f;
+                var ahead = pos + heading * (Mathf.Clamp(vel.magnitude * 0.9f, 0.15f, 0.8f) + size * 0.4f);
+                float da = field.Distance(ahead);
+                if (da < r + keep)
                 {
-                    float d = Mathf.Sqrt(d2) + 1e-4f, f = (r - d) / r * 9;
-                    acc.x += dx / d * f; acc.y += dy / d * f * 0.8f; acc.z += dz / d * f;
+                    wall = field.Gradient(ahead);
+                    wallK = Mathf.Clamp01((r + keep - da) / keep);
+                    float into = Vector3.Dot(vel, wall);
+                    if (into < 0) acc -= wall * (into * 4 * wallK);
+                    acc += wall * (wallK * wallK * 3);
+                    // the way round: along the surface towards the goal, over it when the goal is right behind
+                    var toGoal = (goal - pos).normalized;
+                    var round = toGoal - wall * Vector3.Dot(toGoal, wall);
+                    if (round.sqrMagnitude < 0.09f) round = Vector3.up - wall * wall.y;
+                    if (round.sqrMagnitude < 0.09f) round = Vector3.Cross(wall, heading);
+                    if (round.sqrMagnitude > 1e-4f) acc += round.normalized * (wallK * S.cruise * 3);
+                }
+                float d0 = field.Distance(pos);
+                if (d0 < r + keep * 0.5f) acc += field.Gradient(pos) * ((r + keep * 0.5f - d0) / (keep * 0.5f) * 6);
+                // boxed in (a crevice whose way out leads away from the goal): out, towards the most open water nearby
+                bool pressed = wallK > 0.4f || d0 < r + keep * 0.5f;
+                boxedT = pressed && escapeT <= 0 && vel.magnitude < S.cruise * 0.3f ? boxedT + dt : Mathf.Max(0, boxedT - dt * 0.5f);
+                if (boxedT > 1.5f) { boxedT = 0; escapeT = 6; }
+                // out by the way the water knows, around the decor, all the way to open water (or a while)
+                if (escapeT > 0)
+                {
+                    escapeT -= dt;
+                    escapeWay = field.WayOut(pos);
+                    if (escapeWay == Vector3.zero) escapeT = 0;
+                    else acc += (escapeWay * S.cruise - vel) * 5;
                 }
             }
             // walls, floor and surface
@@ -915,6 +950,10 @@ namespace Aquarium.Fish
             // the filter's current
             float fd = Vector3.Distance(eco.filterOutlet, pos);
             if (fd < 1.5f) acc += new Vector3(-0.6f, -0.05f, 0.1f) * ((1.5f - fd) * 0.6f);
+
+            // nothing else may steer into a surface just ahead: whatever pulls that way slides along it
+            float pull = Vector3.Dot(acc, wall);
+            if (pull < 0) acc -= wall * (pull * wallK);
 
             float maxA = S.accel * (state == FishState.FLEE ? 2.2f : 1) * (burst > 0 ? 1.6f : 1);
             if (acc.magnitude > maxA) acc = acc.normalized * maxA;
@@ -977,6 +1016,8 @@ namespace Aquarium.Fish
             pectF = b.magnitude / pMax;
             pectBrake = Mathf.Clamp01(-Vector3.Dot(b, h) / pMax);
             vel += h * (thrust * dt) + b * dt;
+            // backing and wriggling out of a nook with the fins, whichever way the body points
+            if (escapeT > 0) vel += escapeWay * (Mathf.Max(0, S.cruise * 0.5f - Vector3.Dot(vel, escapeWay)) * Mathf.Min(1, dt * 4));
             // drag: quadratic + a little linear along the body; sideways/vertical much stronger
             fwd = Vector3.Dot(vel, h);
             var side2 = vel - h * fwd;
@@ -985,12 +1026,50 @@ namespace Aquarium.Fish
             side2 *= Mathf.Exp(-dt * (2.5f + 4 * Mathf.Clamp01(Mathf.Abs(fwd) / S.cruise)));
             vel = h * fwd + side2;
             if (vel.magnitude > maxV * 1.15f) vel = vel.normalized * (maxV * 1.15f);
-            pos += vel * dt;
-            // hard limits
+            // move, never into the decor: the body and the nose are kept out of it, in steps short enough
+            // not to slip through a thin wall
+            var step = vel * dt;
+            int steps = field == null ? 1 : Mathf.Max(1, Mathf.CeilToInt(step.magnitude / (field.cell * 0.5f)));
+            for (int s = 0; s < steps; s++)
+            {
+                pos += step / steps;
+                if (field != null) KeepOutOfDecor();
+            }
+            // hard limits (the decor has the last word: they must not push the fish back into it)
             pos.x = Mathf.Clamp(pos.x, -BoundsX - 0.1f, BoundsX + 0.1f);
             pos.z = Mathf.Clamp(pos.z, BoundsZMin - 0.1f, BoundsZMax + 0.1f);
             float hf = eco.HeightAt(pos.x, pos.z) + (sp.bottom ? 0.05f : sp.height * 0.35f);
             pos.y = Mathf.Clamp(pos.y, hf, ceil + 0.05f);
+            if (field != null) KeepOutOfDecor();
+        }
+
+        /// <summary>The body along its length: where (of its length from the middle, the nose ahead) and how thick
+        /// there (of its girth).</summary>
+        public static readonly (float at, float k)[] Profile = { (0.45f, 0.3f), (0.3f, 0.7f), (0.12f, 0.9f), (-0.08f, 0.85f), (-0.25f, 0.6f), (-0.4f, 0.3f) };
+
+        /// <summary>No part of the body, nose to tail, in the decor (twice round: one push can bring another point in).</summary>
+        void KeepOutOfDecor()
+        {
+            // a little more than the body: the field places a thin twig's surface only to half a cell. Getting out of a
+            // nook it squeezes through (a tall fish wedged in a crevice is held by both sides at once)
+            float squeeze = escapeT > 0 ? 0.5f : 1;
+            for (int pass = 0; pass < 2; pass++)
+                foreach (var (at, k) in Profile)
+                    KeepOut(pos + heading * (size * at), (Girth * k + 0.015f) * squeeze);
+        }
+
+        /// <summary>Half the body's thickness, the larger way (tall for an angelfish), plus a little room.</summary>
+        public float Girth => 0.5f * Mathf.Max(sp.height, sp.width) * scale + 0.02f;
+
+        /// <summary>Moves the fish so that a point of its body is at least r from the decor, and stops it moving further in.</summary>
+        void KeepOut(Vector3 at, float r)
+        {
+            float d = eco.field.Distance(at);
+            if (d >= r) return;
+            var g = eco.field.Gradient(at);
+            pos += g * (r - d);
+            float into = Vector3.Dot(vel, g);
+            if (into < 0) vel -= g * into;
         }
 
         /// <summary>A smooth, never-repeating sway in about -1..1: three incommensurate sines.</summary>

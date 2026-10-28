@@ -161,17 +161,18 @@ namespace Aquarium.World
         {
             const float invPi = 1 / Mathf.PI;
             if (sun) { sun.color = c.sun; sun.intensity = c.sunI * invPi * SunScale; }
-            if (fill) { fill.color = H("#9fdfff"); fill.intensity = c.fill * invPi; }
+            if (fill) { fill.color = H("#9fdfff"); fill.intensity = c.fill * invPi * FillScale; }
             // three.js lets the moon spot fade with distance^1.2, URP with distance^2: match at the sand (~10.5 m away)
             if (moon) moon.intensity = c.moon * 40 * invPi * MoonScale;
 
             // hemisphere light plus the diffuse part of the studio environment (constant all day, as
             // in the web version) -> trilight ambient: sky above, ground below, their mix around
-            float hk = c.hemiI * invPi * AmbientScale;
+            // (the room's light that the environment stands for goes down at night, or the dark has no shade)
+            float hk = c.hemiI * invPi * AmbientScale, env = EnvIntensity * (1 - 0.75f * c.night);
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = (c.sky.linear * hk + EnvUp * EnvIntensity).gamma;
-            RenderSettings.ambientGroundColor = (c.ground.linear * hk + EnvDown * EnvIntensity).gamma;
-            RenderSettings.ambientEquatorColor = (Color.Lerp(c.sky, c.ground, 0.5f).linear * hk + EnvSide * EnvIntensity).gamma;
+            RenderSettings.ambientSkyColor = (c.sky.linear * hk + EnvUp * env).gamma;
+            RenderSettings.ambientGroundColor = (c.ground.linear * hk + EnvDown * env).gamma;
+            RenderSettings.ambientEquatorColor = (Color.Lerp(c.sky, c.ground, 0.5f).linear * hk + EnvSide * env).gamma;
 
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
@@ -212,10 +213,11 @@ namespace Aquarium.World
         // the environment dome (Aquarium/EnvSky) convolved for diffuse light, facing up / sideways / down
         static readonly Color EnvUp = new Color(0.6938f, 0.822f, 0.8936f), EnvSide = new Color(0.2203f, 0.2816f, 0.3272f), EnvDown = new Color(0.0338f, 0.0426f, 0.0598f);
         /// <summary>The web version's envMapIntensity.</summary>
-        public static float EnvIntensity = 0.5f;
+        public static float EnvIntensity = 0.25f;
 
-        /// <summary>Calibration against the web version's look (tuned by comparing screenshots).</summary>
-        public static float SunScale = 1, AmbientScale = 1, ExposureBias = 0.8f, MoonScale = 6.5f, FogScale = 0.55f;
+        /// <summary>Calibration of the look. The lamp over the tank is the light that shapes things (it casts the
+        /// shadows); the ambient and the fill only keep the shade from going black, at about a third of it.</summary>
+        public static float SunScale = 1.6f, AmbientScale = 0.55f, FillScale = 0.4f, ExposureBias = 0.8f, MoonScale = 6.5f, FogScale = 0.55f;
 
         static Color Scaled(Color srgb, float k)
         {

@@ -38,6 +38,9 @@ namespace Aquarium.EditorTools
         static AquariumLayout layout;
         static DayCycle day;
         static readonly List<GameObject> walkables = new List<GameObject>();
+        /// <summary>Decor fish swim around besides the walkable one.</summary>
+        static readonly List<GameObject> solids = new List<GameObject>();
+        const string FieldPath = "Assets/Aquarium/Art/Generated/WaterField.bytes";
 
         [MenuItem("Aquarium/Build Scene")]
         public static void BuildMenu()
@@ -62,6 +65,7 @@ namespace Aquarium.EditorTools
             rnd = new Random(2026);
             Materials.Reset();
             walkables.Clear();
+            solids.Clear();
             Directory.CreateDirectory(MeshDir);
             ConfigurePipeline();
             QualityBuilder.Build();
@@ -81,6 +85,7 @@ namespace Aquarium.EditorTools
             BuildLights();
             BuildDecor();
             AddWalkColliders();
+            BakeWaterField();
             BuildPlants();
             BuildRaysAndDust();
             MergeStatic();
@@ -233,15 +238,21 @@ namespace Aquarium.EditorTools
             }
             Obj("BaseFrame", tank, SaveMesh(MeshGen.RoundedBox(new Vector3(W + 0.3f, 0.22f, D + 0.3f), 0.08f, 3, "BaseFrame")), trimMat, P(0, 0.03f, 0));
 
-            // lid with the LED bar and the blue moon LEDs
+            // the lid: a rim round the top edge, a glass cover plate, and the LED lamp on legs above it. The lamp is
+            // where the light comes from (the main light shines from it, straight down through the glass), so neither
+            // the lamp nor the glass casts a shadow; only the rim does, along the edges
             var lidMat = Materials.NewLit("Lid", Hex("#15181e"), 0.55f, 0.3f, fog: false, caustics: 0);
-            Obj("LidRim", tank, SaveMesh(MeshGen.RoundedBox(new Vector3(W + 0.32f, 0.16f, D + 0.32f), 0.06f, 3, "LidRim")), lidMat, P(0, H + 0.02f, 0));
-            Obj("Cover", tank, SaveMesh(MeshGen.Box(new Vector3(W - 0.1f, 0.03f, D - 0.1f), "Cover")), Materials.NewLit("Cover", Hex("#1d2a33"), 0.6f, emission: Hex("#9fe6ff") * 0.06f, fog: false, caustics: 0), P(0, H + 0.06f, 0));
-            Obj("LedBody", tank, SaveMesh(MeshGen.RoundedBox(new Vector3(W - 0.6f, 0.18f, 1.1f), 0.08f, 3, "LedBody")), lidMat, P(0, H + 0.55f, 0));
+            const float rim = 0.22f;
+            var rimLong = SaveMesh(MeshGen.RoundedBox(new Vector3(W + 0.32f, 0.16f, rim), 0.05f, 3, "LidRimLong"));
+            var rimShort = SaveMesh(MeshGen.RoundedBox(new Vector3(rim, 0.16f, D + 0.32f - 2 * rim), 0.05f, 3, "LidRimShort"));
+            foreach (var sz in new[] { -1, 1 }) Obj("LidRim", tank, rimLong, lidMat, P(0, H + 0.02f, sz * (D / 2 + 0.16f - rim / 2)));
+            foreach (var sx in new[] { -1, 1 }) Obj("LidRim", tank, rimShort, lidMat, P(sx * (W / 2 + 0.16f - rim / 2), H + 0.02f, 0));
+            Obj("Cover", tank, SaveMesh(MeshGen.Box(new Vector3(W - 0.1f, 0.03f, D - 0.1f), "Cover")), Materials.NewGlass("Cover", new Color(0.91f, 0.98f, 1, 0.06f)), P(0, H + 0.06f, 0), null, false);
+            Obj("LedBody", tank, SaveMesh(MeshGen.RoundedBox(new Vector3(W - 0.6f, 0.18f, 1.1f), 0.08f, 3, "LedBody")), lidMat, P(0, H + 0.55f, 0), null, false);
             day.led = Materials.NewLit("Led", Color.white, 0.5f, emission: Hex("#e8fbff") * 3, fog: false, caustics: 0);
             Obj("LedStrip", tank, SaveMesh(MeshGen.Box(new Vector3(W - 0.9f, 0.03f, 0.75f), "LedStrip")), day.led, P(0, H + 0.45f, 0), null, false);
             var leg = SaveMesh(MeshGen.Box(new Vector3(0.08f, 0.5f, 0.9f), "LidLeg"));
-            foreach (var sx in new[] { -1, 1 }) Obj("LidLeg", tank, leg, lidMat, P(sx * (W / 2 - 0.4f), H + 0.3f, 0));
+            foreach (var sx in new[] { -1, 1 }) Obj("LidLeg", tank, leg, lidMat, P(sx * (W / 2 - 0.4f), H + 0.3f, 0), null, false);
             day.moonLeds = Materials.NewLit("MoonLed", Color.black, 0.5f, emission: Hex("#5aa7ff"), fog: false, caustics: 0);
             var moonLed = SaveMesh(MeshGen.Sphere(0.035f, 8, 6, "MoonLed"));
             for (int i = 0; i < 12; i++) Obj("MoonLed", tank, moonLed, day.moonLeds, P(-W / 2 + 0.8f + i * ((W - 1.6f) / 11), H + 0.44f, 0.42f), null, false);
@@ -305,7 +316,10 @@ namespace Aquarium.EditorTools
             day.moon.range = 16;
             day.moon.spotAngle = 2 * 0.6f * Mathf.Rad2Deg;
             day.moon.innerSpotAngle = day.moon.spotAngle * 0.2f;
-            day.moon.shadows = LightShadows.None;
+            // the moon LEDs shine from the lamp too: things cast their shadows by its light at night
+            day.moon.shadows = LightShadows.Soft;
+            day.moon.shadowBias = 0.05f;
+            day.moon.shadowNormalBias = 0.3f;
         }
 
         // ------------------------------------------------------------------ models
@@ -355,6 +369,16 @@ namespace Aquarium.EditorTools
                 string role = Materials.RoleOf(r.transform, go.transform);
                 if (role == "Static" && roleRoot) role = Materials.RoleOf(roleRoot, roleRoot.root);
                 var mats = r.sharedMaterials.Select(m => Materials.FromGltf(m, model, role)).ToArray();
+                // a part hanging from where it is fixed (a sail from its yard, weed from a rail) sways by how far
+                // below that point it is: kept per vertex, as the shader otherwise takes the height above
+                if (role == "Sway" && r.TryGetComponent<MeshFilter>(out var mf) && mf.sharedMesh && mf.sharedMesh.bounds.max.y < 0.02f && mf.sharedMesh.bounds.min.y < -0.05f)
+                {
+                    var hung = UnityEngine.Object.Instantiate(mf.sharedMesh);
+                    hung.name = $"{model}_{mf.name}_Hang";
+                    hung.SetUVs(3, hung.vertices.Select(v => new Vector2(-v.y, 0)).ToList());
+                    mf.sharedMesh = SaveMesh(hung);
+                    mats = mats.Select(Materials.Hanging).ToArray();
+                }
                 r.sharedMaterials = mats;
                 r.shadowCastingMode = role == "Glass" ? ShadowCastingMode.Off : ShadowCastingMode.On;
                 if (role == "Glow") foreach (var m in mats) AddGlow(m, Materials.GltfEmission(m), glowDay, glowNight);
@@ -397,8 +421,9 @@ namespace Aquarium.EditorTools
             }
             // driftwood centrepiece
             {
-                float bx = 0.4f, bz = -1.45f, by = Sand(bx, bz);
-                var wood = Place("driftwood", decor, new Vector3(bx, by, bz));
+                // (left of the middle and a little smaller than in the web version, so its long branch stays clear of the wreck's stern)
+                float bx = -0.15f, bz = -1.45f, by = Sand(bx, bz);
+                var wood = Place("driftwood", decor, new Vector3(bx, by, bz), default, 0.74f);
                 walkables.Add(wood);
                 var mesh = wood.GetComponentsInChildren<MeshFilter>().First(f => Materials.RoleOf(f.transform, wood.transform) == "Static");
                 var verts = mesh.sharedMesh.vertices;
@@ -426,7 +451,7 @@ namespace Aquarium.EditorTools
                 Spot("сундук", cx, Sand(cx, cz) + 0.6f, cz + 0.3f, "landmark", 0.4f);
                 layout.chestPosition = P(cx, Sand(cx, cz) + 0.35f, cz);
 
-                Place("bottle", decor, new Vector3(-1.55f, Sand(-1.55f, 1.45f) + 0.05f, 1.45f), new Vector3(Mathf.PI / 2 - 0.1f, 0, 0.7f));
+                solids.Add(Place("bottle", decor, new Vector3(-1.55f, Sand(-1.55f, 1.45f) + 0.05f, 1.45f), new Vector3(Mathf.PI / 2 - 0.1f, 0, 0.7f)));
                 layout.bottlePosition = P(-1.55f, Sand(-1.55f, 1.45f) + 0.1f, 1.45f);
                 Spot("бутылка", -1.55f, Sand(-1.55f, 1.45f) + 0.4f, 1.45f, "landmark", 0.3f);
             }
@@ -464,7 +489,7 @@ namespace Aquarium.EditorTools
             // old lantern (front left)
             {
                 float lx = -4.9f, lz = 1.4f, ly = Sand(lx, lz);
-                Place("lantern", decor, new Vector3(lx, ly - 0.02f, lz), new Vector3(0.15f, 0.4f, -0.25f), 1.3f, 0.4f, 5);
+                solids.Add(Place("lantern", decor, new Vector3(lx, ly - 0.02f, lz), new Vector3(0.15f, 0.4f, -0.25f), 1.3f, 0.4f, 5));
                 var pl = new GameObject("LanternLight").AddComponent<Light>();
                 pl.transform.SetParent(decor, false);
                 pl.transform.localPosition = P(lx, ly + 0.35f, lz);
@@ -578,6 +603,184 @@ namespace Aquarium.EditorTools
                 f.gameObject.AddComponent<MeshCollider>().sharedMesh = f.sharedMesh;
             }
             Physics.SyncTransforms();
+        }
+
+        /// <summary>
+        /// The water around the decor as a signed distance to its shapes (WaterField), for fish to swim
+        /// around. Cells the decor's surface passes through are decor, and so is whatever the open water
+        /// cannot reach from the top (the inside of a rock or a wall); a hold or the space under an arch,
+        /// reached through an opening, is water. The sand stops the flood but is not decor itself.
+        /// </summary>
+        static void BakeWaterField()
+        {
+            var started = DateTime.Now;
+            const float cell = 0.06f;
+            var lo = new Vector3(-5.9f, -0.3f, -2.25f);   // web coordinates of the first cell's centre
+            int nx = Mathf.CeilToInt(11.8f / cell) + 1, ny = Mathf.CeilToInt(5.9f / cell) + 1, nz = Mathf.CeilToInt(4.5f / cell) + 1;
+            int Idx(int x, int y, int z) => (z * ny + y) * nx + x;
+            Vector3 At(int x, int y, int z) => lo + new Vector3(x, y, z) * cell;
+
+            // the walkable decor has colliders; the rest gets some for the bake, and so do the sails (they sway a
+            // little, but fish swim round a sail, not through it)
+            var temp = new List<Collider>();
+            foreach (var go in solids.Concat(walkables))
+            foreach (var f in go.GetComponentsInChildren<MeshFilter>())
+            {
+                bool sail = f.name.Contains("Sail");
+                if ((Materials.RoleOf(f.transform, go.transform) == "Sway" && !sail) || f.GetComponent<Collider>()) continue;
+                var c = f.gameObject.AddComponent<MeshCollider>();
+                c.sharedMesh = f.sharedMesh;
+                temp.Add(c);
+            }
+            Physics.SyncTransforms();
+            var decorColliders = new HashSet<Collider>(walkables.Concat(solids).SelectMany(g => g.GetComponentsInChildren<Collider>()));
+
+            // 0 water not reached yet, 1 decor, 2 sand, 3 water reached from the top
+            const byte Unknown = 0, Decor = 1, SandCell = 2, Open = 3;
+            var cls = new byte[nx * ny * nz];
+            for (int z = 0; z < nz; z++)
+            for (int x = 0; x < nx; x++)
+            {
+                var p = At(x, 0, z);
+                float sand = Sand(p.x, p.z) - cell;
+                for (int y = 0; y < ny && lo.y + y * cell < sand; y++) cls[Idx(x, y, z)] = SandCell;
+            }
+            var hits = new Collider[32];
+            var half = Vector3.one * (cell * 0.5f);
+            foreach (var c in decorColliders)
+            {
+                var b = c.bounds;   // Unity coordinates, x mirrored
+                int x0 = Mathf.Max(0, Mathf.FloorToInt((-b.max.x - lo.x) / cell)), x1 = Mathf.Min(nx - 1, Mathf.CeilToInt((-b.min.x - lo.x) / cell));
+                int y0 = Mathf.Max(0, Mathf.FloorToInt((b.min.y - lo.y) / cell)), y1 = Mathf.Min(ny - 1, Mathf.CeilToInt((b.max.y - lo.y) / cell));
+                int z0 = Mathf.Max(0, Mathf.FloorToInt((b.min.z - lo.z) / cell)), z1 = Mathf.Min(nz - 1, Mathf.CeilToInt((b.max.z - lo.z) / cell));
+                for (int z = z0; z <= z1; z++)
+                for (int y = y0; y <= y1; y++)
+                for (int x = x0; x <= x1; x++)
+                {
+                    int i = Idx(x, y, z);
+                    if (cls[i] != Unknown) continue;
+                    int n = Physics.OverlapBoxNonAlloc(P(At(x, y, z)), half, hits, Quaternion.identity, ~0, QueryTriggerInteraction.Ignore);
+                    for (int k = 0; k < n; k++)
+                        if (decorColliders.Contains(hits[k])) { cls[i] = Decor; break; }
+                }
+            }
+            foreach (var c in temp) UnityEngine.Object.DestroyImmediate(c);
+
+            // the open water: everything reachable from the surface between the decor's walls
+            var queue = new Queue<int>();
+            for (int z = 0; z < nz; z++)
+            for (int x = 0; x < nx; x++)
+            {
+                int i = Idx(x, ny - 1, z);
+                if (cls[i] == Unknown) { cls[i] = Open; queue.Enqueue(i); }
+            }
+            while (queue.Count > 0)
+            {
+                int i = queue.Dequeue(), x = i % nx, y = i / nx % ny, z = i / (nx * ny);
+                void Visit(int j) { if (cls[j] == Unknown) { cls[j] = Open; queue.Enqueue(j); } }
+                if (x > 0) Visit(i - 1);
+                if (x < nx - 1) Visit(i + 1);
+                if (y > 0) Visit(i - nx);
+                if (y < ny - 1) Visit(i + nx);
+                if (z > 0) Visit(i - nx * ny);
+                if (z < nz - 1) Visit(i + nx * ny);
+            }
+
+            // signed distance: from water to the nearest decor cell, from inside the decor to the nearest
+            // open water (not to the sand it stands on: the way out of a rock is never down)
+            var solid = cls.Select(c => c == Decor || c == Unknown).ToArray();
+            var toDecor = SquaredDistance(solid, nx, ny, nz);
+            var toWater = SquaredDistance(cls.Select(c => c == Open).ToArray(), nx, ny, nz);
+            var d = new sbyte[cls.Length];
+            for (int i = 0; i < d.Length; i++)
+                d[i] = WaterField.Quantize(solid[i] ? -(Mathf.Sqrt(toWater[i]) - 0.5f) * cell : (Mathf.Sqrt(toDecor[i]) - 0.5f) * cell);
+            // the way out of every nook: cells of water from open water (half a metre clear of the decor), around it,
+            // by roomy water first (where a fish fits, and not low over the sand, where only bottom fish go), then
+            // into the tight spots off it; never through the sand
+            var exit = Enumerable.Repeat((byte)255, d.Length).ToArray();
+            sbyte open = WaterField.Quantize(0.45f), roomy = WaterField.Quantize(0.12f);
+            var low = new bool[d.Length];
+            for (int z = 0; z < nz; z++)
+            for (int x = 0; x < nx; x++)
+            {
+                var p = At(x, 0, z);
+                float sand = Sand(p.x, p.z) + 0.2f;
+                for (int y = 0; y < ny && lo.y + y * cell < sand; y++) low[Idx(x, y, z)] = true;
+            }
+            bool Swimmable(int i) => !solid[i] && cls[i] != SandCell;
+            foreach (bool tight in new[] { false, true })
+            {
+                queue.Clear();
+                for (int i = 0; i < d.Length; i++)
+                    if (Swimmable(i) && (tight ? exit[i] < 255 : d[i] >= open && !low[i])) { if (!tight) exit[i] = 0; queue.Enqueue(i); }
+                if (tight) queue = new Queue<int>(queue.OrderBy(i => exit[i]));
+                while (queue.Count > 0)
+                {
+                    int i = queue.Dequeue(), x = i % nx, y = i / nx % ny, z = i / (nx * ny);
+                    byte next = (byte)Math.Min(254, exit[i] + 1);
+                    void Step(int j) { if (Swimmable(j) && exit[j] == 255 && (tight || d[j] >= roomy && !low[j])) { exit[j] = next; queue.Enqueue(j); } }
+                    if (x > 0) Step(i - 1);
+                    if (x < nx - 1) Step(i + 1);
+                    if (y > 0) Step(i - nx);
+                    if (y < ny - 1) Step(i + nx);
+                    if (z > 0) Step(i - nx * ny);
+                    if (z < nz - 1) Step(i + nx * ny);
+                }
+            }
+            var field = new WaterField(nx, ny, nz, lo, cell, d, exit);
+            File.WriteAllBytes(FieldPath, field.Save());
+            AssetDatabase.ImportAsset(FieldPath);
+            layout.waterField = AssetDatabase.LoadAssetAtPath<TextAsset>(FieldPath);
+
+            int decorN = cls.Count(c => c == Decor), enclosed = cls.Count(c => c == Unknown);
+            Debug.Log($"WATER FIELD {nx}×{ny}×{nz}: {decorN} decor cells, {enclosed} enclosed, the deepest nook {exit.Where(e => e < 255).Max() * cell:0.0} m from open water, {(DateTime.Now - started).TotalSeconds:0.0} s");
+            foreach (var s in layout.spots) Debug.Log($"WATER FIELD at {s.name} ({s.kind}): {field.Distance(P(s.position)):0.00} m");
+        }
+
+        /// <summary>Squared distance, in cells, from every cell to the nearest marked one
+        /// (exact Euclidean, one axis at a time: Felzenszwalb and Huttenlocher).</summary>
+        static float[] SquaredDistance(bool[] marked, int nx, int ny, int nz)
+        {
+            const double Inf = 1e20;
+            var f = new double[marked.Length];
+            for (int i = 0; i < f.Length; i++) f[i] = marked[i] ? 0 : Inf;
+            int longest = Math.Max(nx, Math.Max(ny, nz));
+            var line = new double[longest];
+            var outLine = new double[longest];
+            var v = new int[longest];
+            var zs = new double[longest + 1];
+            void Axis(int n, int stride, IEnumerable<int> starts)
+            {
+                foreach (int s in starts)
+                {
+                    for (int q = 0; q < n; q++) line[q] = f[s + q * stride];
+                    int k = 0;
+                    v[0] = 0; zs[0] = -Inf; zs[1] = Inf;
+                    for (int q = 1; q < n; q++)
+                    {
+                        // where the parabola from q overtakes the lowest so far (zs[0] = -Inf ends the search)
+                        double c = (line[q] + q * q - (line[v[k]] + v[k] * v[k])) / (2.0 * (q - v[k]));
+                        while (c <= zs[k])
+                        {
+                            k--;
+                            c = (line[q] + q * q - (line[v[k]] + v[k] * v[k])) / (2.0 * (q - v[k]));
+                        }
+                        k++;
+                        v[k] = q; zs[k] = c; zs[k + 1] = Inf;
+                    }
+                    k = 0;
+                    for (int q = 0; q < n; q++)
+                    {
+                        while (zs[k + 1] < q) k++;
+                        outLine[q] = (q - v[k]) * (double)(q - v[k]) + line[v[k]];
+                    }
+                    for (int q = 0; q < n; q++) f[s + q * stride] = outLine[q];
+                }
+            }
+            Axis(nx, 1, from z in Enumerable.Range(0, nz) from y in Enumerable.Range(0, ny) select (z * ny + y) * nx);
+            Axis(ny, nx, from z in Enumerable.Range(0, nz) from x in Enumerable.Range(0, nx) select z * nx * ny + x);
+            Axis(nz, nx * ny, from y in Enumerable.Range(0, ny) from x in Enumerable.Range(0, nx) select y * nx + x);
+            return f.Select(x => (float)Math.Min(x, 1e9)).ToArray();
         }
 
         /// <summary>Instances of a mesh merged into one, with a colour per instance; for swaying ones uv3.x

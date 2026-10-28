@@ -455,25 +455,25 @@ namespace Aquarium.App
             Range(view, "Яркость", 0.6f, 1.6f, shell.day.exposureMul, v => $"{Mathf.RoundToInt(v * 100)}%", v => shell.SetPref("exposure", v));
             Check(view, "Показывать FPS и видеокарту", Prefs.Get("fps", 1f) > 0.5f, v => shell.SetPref("fps", v ? 1 : 0));
             L("ВИДЕОКАРТА", "sect", view);
-            L($"Сейчас рисует: {GpuChoice.Current}", "tip", view);
-            if (GpuChoice.CanChoose)
+            var cards = GpuChoice.CanChoose ? GpuChoice.Cards() : new List<GpuChoice.Card>();
+            if (cards.Count < 2) L($"Рисует: {GpuChoice.Current}", "tip", view);
+            else
             {
-                // Windows' own setting for this program, each choice named with the card Windows gives for it
-                int saved = GpuChoice.Saved();
-                string Named(string title, int pref) => GpuChoice.NameFor(pref) is string n ? $"{title} — {n}" : title;
-                bool web = Application.platform == RuntimePlatform.WebGLPlayer;
-                var options = web
-                    ? new[] { ("0", "Как решит браузер"), ("2", "Производительная"), ("1", "Экономная") }
-                    : new[] { ("0", "Как решит Windows"), ("2", Named("Высокая производительность", 2)), ("1", Named("Энергосбережение", 1)) };
-                Button restart = null;
-                Choice(view, "Видеокарта", options, options.Any(o => o.Item1 == saved.ToString()) ? saved.ToString() : "0", v =>
+                // the cards by name; the one picked is applied by starting again on it
+                var now = GpuChoice.CurrentOf(cards);
+                var pick = now ?? cards[0];
+                var box = E("setting", view);
+                var drop = new DropdownField(cards.Select(c => c.name).ToList(), cards.IndexOf(pick));
+                drop.AddToClassList("drop");
+                box.Add(drop);
+                Button apply = null;
+                drop.RegisterValueChangedCallback(_ =>
                 {
-                    GpuChoice.Choose(int.Parse(v));
-                    restart.style.display = DisplayStyle.Flex;
-                    Hint("Видеокарта выбирается при запуске — перезапустите аквариум");
+                    pick = cards[drop.index];
+                    apply.style.display = pick != now ? DisplayStyle.Flex : DisplayStyle.None;
                 });
-                restart = B("Перезапустить аквариум", "wide", () => { Eco.Save(); GpuChoice.Restart(); }, view);
-                restart.style.display = DisplayStyle.None;
+                apply = B("Применить", "wide", () => { GpuChoice.Choose(pick); Eco.Save(); GpuChoice.Restart(); }, view);
+                apply.style.display = pick != now ? DisplayStyle.Flex : DisplayStyle.None;
             }
 
             var sound = setBodies["sound"];

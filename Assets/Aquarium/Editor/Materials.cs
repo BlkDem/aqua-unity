@@ -17,7 +17,7 @@ namespace Aquarium.EditorTools
         /// <summary>How strongly Sway* parts of each model bend in the current (web: decorAssets.js SWAY).</summary>
         public static readonly Dictionary<string, float> Sway = new Dictionary<string, float>
         {
-            ["castle"] = 2.0f, ["ship"] = 0.25f, ["vallisneria"] = 0.55f, ["sword"] = 0.22f, ["crypt"] = 0.18f, ["anubias"] = 0.08f,
+            ["castle"] = 2.0f, ["ship"] = 0.6f, ["vallisneria"] = 0.55f, ["sword"] = 0.22f, ["crypt"] = 0.18f, ["anubias"] = 0.08f,
             ["limnophila"] = 0.45f, ["cabomba"] = 0.6f, ["ludwigia"] = 0.4f, ["pistia"] = 0, ["corals"] = 3.5f,
         };
 
@@ -150,6 +150,20 @@ namespace Aquarium.EditorTools
                 m.enableInstancing = true;
                 m = Save(key, m);
             }
+            made[key] = m;
+            return m;
+        }
+
+        /// <summary>A swaying material for hanging parts: the sway height comes from uv3.x (the depth below the
+        /// part's fixing point), and they move more freely than things rooted at the bottom.</summary>
+        public static Material Hanging(Material sway)
+        {
+            string key = sway.name + "_Hang";
+            if (made.TryGetValue(key, out var done)) return done;
+            var m = new Material(sway);
+            m.SetFloat("_SwayFromUV3", 1);
+            m.SetFloat("_Sway", Mathf.Max(sway.GetFloat("_Sway"), 0.9f));
+            m = Save(key, m);
             made[key] = m;
             return m;
         }

@@ -71,6 +71,10 @@ namespace Aquarium.Fish
         public abstract string Status { get; }
         /// <summary>Roughly how big it is (for picking and the selection ring).</summary>
         public virtual float size => 0.15f;
+        /// <summary>Half its body's length, head to tail: how far from its middle it stands on the ground.</summary>
+        public virtual float Half => 0.07f * root.localScale.x;
+        /// <summary>Which way its body faces (web space).</summary>
+        public Vector3 Forward => rot * Vector3.forward;
 
         /// <summary>Turn smoothly to stand on a surface with normal `up`, facing `fwd` (web space).</summary>
         protected void Orient(Vector3 up, Vector3 fwd, float k)
@@ -79,6 +83,51 @@ namespace Aquarium.Fish
             if (a.sqrMagnitude < 1e-6f) a = Vector3.Cross(up, Vector3.right);
             rot = Quaternion.Slerp(rot, Quaternion.LookRotation(a.normalized, up), k);
         }
+
+        /// <summary>Stand on the ground facing fwd: turn towards its slope (at `turn` per second), then rise until
+        /// no part of the body, as it is turned now, is in it; off an edge it sinks down to the ground below.</summary>
+        protected void StandOn(Vector3 fwd, float dt, float turn)
+        {
+            Orient(eco.Slope(pos.x, pos.z, pos.y, fwd, Half), fwd, 1 - Mathf.Exp(-turn * dt));
+            pos.y = Mathf.Max(eco.Lift(pos.x, pos.z, pos.y, rot, Half, out _), pos.y - Fall * dt);
+            OutOfWalls();
+        }
+
+        /// <summary>Whether some of the body (middle, head, tail, sides) is inside the decor.</summary>
+        protected bool InDecor()
+        {
+            var field = eco.field;
+            if (field == null) return false;
+            var up = rot * Vector3.up;
+            var f = rot * Vector3.forward;
+            var side = Vector3.Cross(up, f);
+            foreach (var o in new[] { Vector3.zero, f * Half, -f * Half, side * (Half * 0.6f), -side * (Half * 0.6f) })
+                if (field.Distance(pos + o + up * 0.03f) < -0.01f) return true;
+            return false;
+        }
+
+        /// <summary>No part of the body (head, tail, sides) inside a wall of decor: pushed back out of it, sideways.</summary>
+        protected void OutOfWalls()
+        {
+            var field = eco.field;
+            if (field == null) return;
+            var f = rot * Vector3.forward; f.y = 0; f.Normalize();
+            var side = new Vector3(f.z, 0, -f.x);
+            foreach (var o in new[] { f * Half, -f * Half, side * (Half * 0.6f), -side * (Half * 0.6f) })
+            {
+                var p = pos + o + Vector3.up * 0.04f;
+                float d = field.Distance(p);
+                if (d >= 0.01f) continue;
+                var g = field.Gradient(p); g.y = 0;
+                if (g.sqrMagnitude > 1e-6f) pos += g.normalized * (0.01f - d);
+            }
+        }
+
+        /// <summary>How fast it sinks when it steps off an edge, m/s.</summary>
+        protected const float Fall = 1.2f;
+
+        /// <summary>Whether a step to (x, z) is one the body can take: no wall of decor higher than `climb` in the way.</summary>
+        protected bool CanStep(float x, float z) => eco.Lift(x, z, pos.y, rot, Half, out bool wall) - pos.y < Ecosystem.Climb && !wall;
 
         protected void Place()
         {
@@ -93,7 +142,8 @@ namespace Aquarium.Fish
         enum S { WANDER, FOOD, FORAGE, HOP }
         S state = S.WANDER;
         public override string Status => state switch { S.HOP => "Прыгает", S.FORAGE => "Ищет еду", S.FOOD => "Нашла корм!", _ => "Бродит по декорациям" };
-        float t, dur = 3, walk, clawPhase, clawAmp, walkAmp, tilt;
+        public override float Half => 0.13f * root.localScale.x;
+        float t, dur = 3, walk, clawPhase, clawAmp, walkAmp, tilt, wedged;
         Vector3 target, heading = Vector3.right;
         (Vector3 from, Vector3 to, float t, float dur, float h)? hop;
         FoodItem food;
@@ -160,7 +210,16 @@ namespace Aquarium.Fish
 
         public void StartHop(Vector3 to, float h = 0.4f)
         {
-            hop = (pos, to, 0, 0.6f + Vector3.Distance(pos, to) * 0.5f, h);
+            // high enough to clear whatever lies between (a rock, the ship's side)
+            float dist = Vector3.Distance(pos, to), cap = Mathf.Max(pos.y, to.y) + 1.5f;
+            for (int i = 1; i < 10; i++)
+            {
+                float k = i / 10f, s = k * k * (3 - 2 * k);
+                var p = Vector3.Lerp(pos, to, s);
+                float need = Mathf.Min(eco.SurfaceAt(p.x, p.z), cap) + Half - p.y;
+                h = Mathf.Max(h, need / Mathf.Sin(k * Mathf.PI) - dist * 0.2f);
+            }
+            hop = (pos, to, 0, 0.6f + dist * 0.5f, h);
             state = S.HOP;
         }
 
@@ -176,8 +235,11 @@ namespace Aquarium.Fish
                 a.y += Mathf.Sin(k * Mathf.PI) * (hh + Vector3.Distance(from, to) * 0.2f);
                 var b = a - pos;
                 if (b.sqrMagnitude > 1e-8f) heading = b.normalized;
-                pos = a;
                 Orient(Y, heading, 1 - Mathf.Exp(-8 * dt));
+                // over whatever lies between, never through it
+                if (eco.field != null) a = eco.field.Clear(a, 0.03f);
+                a.y = Mathf.Max(a.y, eco.Lift(a.x, a.z, a.y, rot, Half, out _));
+                pos = a;
                 // swimmerets flutter, a flick of the tail
                 tail.Set((X, Mathf.Sin(t * 30) * 0.4f));
                 foreach (var sg in segs) sg.Set((X, -0.1f + Mathf.Sin(t * 20) * 0.1f));
@@ -216,9 +278,8 @@ namespace Aquarium.Fish
             heading = Vector3.Lerp(heading, dir, 1 - Mathf.Exp(-4 * dt)).normalized;
             float sp = 0.16f * (state == S.FOOD ? 1.6f : 1);
             float nx = pos.x + heading.x * sp * dt, nz = pos.z + heading.z * sp * dt;
-            float ny = eco.SurfaceAt(nx, nz);
-            if (ny - pos.y > 0.25f) { StartHop(eco.SurfacePoint(target.x, target.z), 0.3f); return; }
-            pos = new Vector3(nx, ny, nz);
+            if (!CanStep(nx, nz)) { StartHop(eco.SurfacePoint(target.x, target.z), 0.3f); return; }
+            pos = new Vector3(nx, pos.y, nz);
             Stand(dt, sp);
         }
 
@@ -241,7 +302,11 @@ namespace Aquarium.Fish
             walk += speed * dt * 60;
             walkAmp = speed > 0 ? 1 : 0.1f;
             if (state != S.FORAGE) clawAmp *= 0.9f;
-            Orient(eco.SurfaceNormal(pos.x, pos.z), heading, 1 - Mathf.Exp(-6 * dt));
+            // the whole body on the ground, none of it in the decor
+            StandOn(heading, dt, 6);
+            // caught with part of the body in the decor anyway (a tangle of twigs): hop clear
+            wedged = InDecor() ? wedged + dt : 0;
+            if (wedged > 0.7f) { wedged = 0; StartHop(eco.RandomSurfacePoint(false, pos, 1.2f), 0.4f); }
             AnimateLegs(walkAmp);
             tail.Set((X, Mathf.Sin(eco.time * 1.5f + id) * 0.1f));
             foreach (var sg in segs) sg.Set((X, Mathf.Sin(eco.time * 1.1f + id) * 0.03f));
@@ -279,6 +344,7 @@ namespace Aquarium.Fish
         string pane;
         float u, v, ang, retract, t, crawl, pause;
         public override string Status => retract > 0.5f ? "Спряталась в раковину" : mode == "glass" ? "Ползёт по стеклу" : food != null ? "Ползёт к корму" : "Исследует грунт";
+        public override float Half => (type == "ramshorn" ? 0.06f : 0.09f) * root.localScale.x;
         public bool reachedTop, goalTop;
         Vector3 heading = Vector3.right, normal = Vector3.up;
         Vector3? goal;
@@ -394,9 +460,13 @@ namespace Aquarium.Fish
             var a = goal.Value - pos; a.y = 0; a.Normalize();
             heading = Vector3.Lerp(heading, a, 1 - Mathf.Exp(-1.5f * dt)).normalized;
             float nx = pos.x + heading.x * speed * dt, nz = pos.z + heading.z * speed * dt;
-            pos = new Vector3(nx, eco.SurfaceAt(nx, nz), nz);
-            normal = Vector3.Lerp(normal, eco.SurfaceNormal(nx, nz), 1 - Mathf.Exp(-3 * dt)).normalized;
+            // a wall of decor ahead: another way
+            if (!CanStep(nx, nz)) { goal = null; nx = pos.x; nz = pos.z; }
+            pos = new Vector3(nx, pos.y, nz);
+            normal = Vector3.Lerp(normal, eco.Slope(nx, nz, pos.y, heading, Half), 1 - Mathf.Exp(-3 * dt)).normalized;
             Orient(normal, heading, 1 - Mathf.Exp(-3 * dt));
+            pos.y = Mathf.Max(eco.Lift(nx, nz, pos.y, rot, Half, out _), pos.y - Fall * dt);
+            OutOfWalls();
             Place();
             // reached a wall -> climb the glass
             string nearWall = Mathf.Abs(nx) > Glass.side - 0.2f ? (nx > 0 ? "right" : "left") : nz > Glass.front - 0.2f ? "front" : nz < Glass.back + 0.2f ? "back" : null;
@@ -470,6 +540,7 @@ namespace Aquarium.Fish
         float facing, t, wave, walk, amp, dir = 1, scared, pick, fast, idle;
         public override string Status => idle > 0 ? "Размышляет" : wave > 0 ? "Машет клешнями" : "Ходит боком";
         public override float size => 0.25f;
+        public override float Half => 0.1f * root.localScale.x;
         Vector3? goal;
         FoodItem food;
         readonly Transform body;
@@ -549,10 +620,12 @@ namespace Aquarium.Fish
                 facing += dd * Mathf.Min(1, dt * 2);
                 dir = side;   // walking towards the body's left (+1) or right (-1)
                 float nx = pos.x + a.x * speed * dt, nz = pos.z + a.z * speed * dt;
-                pos = new Vector3(nx, eco.SurfaceAt(nx, nz), nz);
+                if (CanStep(nx, nz)) pos = new Vector3(nx, pos.y, nz);
+                else goal = null;   // a wall of decor: another way
             }
             Animate(dt, speed);
-            Orient(eco.SurfaceNormal(pos.x, pos.z), new Vector3(Mathf.Sin(facing), 0, Mathf.Cos(facing)), 1 - Mathf.Exp(-5 * dt));
+            var face = new Vector3(Mathf.Sin(facing), 0, Mathf.Cos(facing));
+            StandOn(face, dt, 5);
             Place();
         }
 

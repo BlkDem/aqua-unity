@@ -53,7 +53,10 @@ namespace Aquarium.Fish
         public readonly List<Critter> critters = new List<Critter>();
         public readonly List<Place> spots = new List<Place>();
         public readonly List<Place> clumps = new List<Place>();
+        /// <summary>Rough spheres around the decor (plants keep off them).</summary>
         public readonly List<Obstacle> colliders = new List<Obstacle>();
+        /// <summary>The decor's real shapes: fish swim around them (null in a scene without one).</summary>
+        public readonly WaterField field;
         public readonly Dictionary<string, SchoolState> schools = new Dictionary<string, SchoolState>();
         public readonly Dictionary<int, Fish> byId = new Dictionary<int, Fish>();
         public readonly Dictionary<int, Fish> byUid = new Dictionary<int, Fish>();
@@ -85,11 +88,12 @@ namespace Aquarium.Fish
         {
             this.world = world;
             this.layout = layout;
-            BuildHeightGrid();
+            Physics.SyncTransforms();
             foreach (var s in layout.spots) spots.Add(new Place { name = s.name, kind = s.kind, pos = Web(s.position), radius = s.radius });
             foreach (var c in layout.clumps) clumps.Add(new Place { name = c.name, kind = "plants", pos = Web(c.position), radius = c.radius });
             spots.AddRange(clumps);
             foreach (var o in layout.obstacles) colliders.Add(new Obstacle { center = Web(o.center), radius = o.radius });
+            if (layout.waterField) field = WaterField.Load(layout.waterField.bytes);
             filterOutlet = Web(layout.filterOutlet);
             aerator = bubbles.AddSource("аэратора", Web(layout.aerator), 16, 0.008f, 0.03f, 0.05f);
             filterSrc = bubbles.AddSource("фильтра", filterOutlet + new Vector3(-0.1f, -0.05f, 0), 5, 0.005f, 0.014f, 0.04f);
@@ -130,38 +134,69 @@ namespace Aquarium.Fish
 
         public float HeightAt(float x, float z) => Terrain.SandHeight(x, z);
         // ----------------------------------------------------------- surfaces critters walk on
-        // a grid over the tank floor: the sand, or the top of the decor where there is some
-        float[] grid;
-        int gnx, gnz;
-        const float GridStep = 0.1f;
-        float gx0, gz0;
-
-        void BuildHeightGrid()
-        {
-            gx0 = -(Terrain.W - 0.3f) / 2; gz0 = -(Terrain.D - 0.3f) / 2;
-            gnx = Mathf.CeilToInt((Terrain.W - 0.3f) / GridStep) + 1;
-            gnz = Mathf.CeilToInt((Terrain.D - 0.3f) / GridStep) + 1;
-            grid = new float[gnx * gnz];
-            Physics.SyncTransforms();
-            for (int j = 0; j < gnz; j++)
-            for (int i = 0; i < gnx; i++)
-            {
-                float x = gx0 + i * GridStep, z = gz0 + j * GridStep, y = Terrain.SandHeight(x, z);
-                if (Physics.Raycast(new Vector3(-x, 7, z), Vector3.down, out var hit, 7, layout ? (int)layout.walkable : ~0, QueryTriggerInteraction.Ignore)
-                    && hit.point.y > y && hit.point.y < 5.3f) y = hit.point.y;
-                grid[j * gnx + i] = y;
-            }
-        }
-
-        /// <summary>Whatever is underfoot at (x, z): sand or the top of the decor (critters walk there, food settles there).</summary>
+        /// <summary>Whatever is underfoot at (x, z): sand or the top of the decor there, by the decor's own
+        /// colliders (critters walk there, food settles there).</summary>
         public float SurfaceAt(float x, float z)
         {
-            if (grid == null) return HeightAt(x, z);
-            float fx = Mathf.Clamp((x - gx0) / GridStep, 0, gnx - 1.001f), fz = Mathf.Clamp((z - gz0) / GridStep, 0, gnz - 1.001f);
-            int i = (int)fx, j = (int)fz;
-            float u = fx - i, v = fz - j;
-            float a = grid[j * gnx + i], b = grid[j * gnx + i + 1], c = grid[(j + 1) * gnx + i], d = grid[(j + 1) * gnx + i + 1];
-            return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+            float y = HeightAt(x, z);
+            if (Physics.Raycast(new Vector3(-x, 7, z), Vector3.down, out var hit, 7, layout ? (int)layout.walkable : ~0, QueryTriggerInteraction.Ignore)
+                && hit.point.y > y && hit.point.y < 5.3f) y = hit.point.y;
+            return y;
+        }
+
+        /// <summary>How high a walker steps up at most; anything higher is a wall.</summary>
+        public const float Climb = 0.25f;
+
+        /// <summary>The ground a walker at height y finds under (x, z): the top of the decor or the sand below a
+        /// step's height above its feet (not a mast or a roof further up). NaN where that is inside the decor:
+        /// a wall.</summary>
+        public float GroundUnder(float x, float z, float y)
+        {
+            float sand = HeightAt(x, z), from = y + Climb;
+            if (from <= sand) return sand;
+            if (field != null && field.Distance(new Vector3(x, from, z)) < 0) return float.NaN;
+            return Physics.Raycast(new Vector3(-x, from, z), Vector3.down, out var hit, from - sand, layout ? (int)layout.walkable : ~0, QueryTriggerInteraction.Ignore)
+                ? Mathf.Max(sand, hit.point.y) : sand;
+        }
+
+        /// <summary>The slope a walker of half length `half` at height y stands on at (x, z), facing fwd: from the
+        /// ground under its head and tail, and under its sides.</summary>
+        public Vector3 Slope(float x, float z, float y, Vector3 fwd, float half)
+        {
+            var (f, side) = Flat(fwd);
+            float across = half * 0.6f, c = GroundUnder(x, z, y);
+            if (float.IsNaN(c)) c = y;
+            // over an edge the far point drops away: the body leans no further than its length allows; a wall counts as level
+            float At(Vector3 o) { float g = GroundUnder(x + o.x, z + o.z, y); return float.IsNaN(g) ? c : Mathf.Max(g, c - half); }
+            var n = Vector3.Cross(f * (2 * half) + Vector3.up * (At(f * half) - At(-f * half)), side * (2 * across) + Vector3.up * (At(side * across) - At(-side * across))).normalized;
+            // limit the tilt so walkers don't look glued on sideways
+            if (n.y < 0.45f) { n.y = 0.45f; n.Normalize(); }
+            return n;
+        }
+
+        /// <summary>How high the middle of a walker at height y, turned as `rot` (web space), stands at (x, z): just
+        /// high enough that none of its body, middle, head, tail or sides, is in the ground. `wall`: some of it
+        /// is against decor higher than a step.</summary>
+        public float Lift(float x, float z, float y, Quaternion rot, float half, out bool wall)
+        {
+            var up = rot * Vector3.up;
+            var (f, side) = Flat(rot * Vector3.forward);
+            float lift = float.MinValue, k = 1 / Mathf.Max(up.y, 0.3f);
+            wall = false;
+            foreach (var o in new[] { Vector3.zero, f * half, -f * half, side * (half * 0.6f), -side * (half * 0.6f) })
+            {
+                float g = GroundUnder(x + o.x, z + o.z, y);
+                if (float.IsNaN(g)) { wall = true; continue; }
+                lift = Mathf.Max(lift, g + (up.x * o.x + up.z * o.z) * k);
+            }
+            return lift == float.MinValue ? y : lift;
+        }
+
+        static (Vector3 fwd, Vector3 side) Flat(Vector3 fwd)
+        {
+            fwd.y = 0;
+            fwd = fwd.sqrMagnitude > 1e-6f ? fwd.normalized : Vector3.right;
+            return (fwd, new Vector3(fwd.z, 0, -fwd.x));
         }
 
         public Vector3 SurfaceNormal(float x, float z)

@@ -8,13 +8,14 @@ using Aquarium.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
 using static Aquarium.World.WebSpace;
 
 namespace Aquarium.EditorTools
 {
     public static class Snapshot
     {
-        const string Out = "Docs/unity";
+        static string Out => System.Environment.GetEnvironmentVariable("AQ_OUT") ?? "Docs/unity";
 
         public static void BuildAndRender()
         {
@@ -59,6 +60,99 @@ namespace Aquarium.EditorTools
                 }
             }
             Debug.Log("Snapshots rendered");
+        }
+
+        /// <summary>Close-ups of the walkers on the decor (shrimp on the wreck first): does any of them sink in?</summary>
+        public static void Walkers()
+        {
+            EditorSettings.asyncShaderCompilation = false;
+            EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
+            var cam = Camera.main;
+            cam.GetComponent<OrbitCamera>().enabled = false;
+            Object.FindAnyObjectByType<AquariumClock>().Apply(12);
+            var app = Object.FindAnyObjectByType<Aquarium.Fish.AquariumApp>();
+            app.Boot(new Aquarium.Life.MemoryWorldStore());
+            UnityEngine.Random.InitState(5);
+            Directory.CreateDirectory(Out);
+            var eco = app.Eco;
+            int shots = 0;
+            var seen = new System.Collections.Generic.HashSet<Aquarium.Fish.Critter>();
+            for (int i = 0; i < 30 * 600 && shots < 8; i++)
+            {
+                app.Simulate(1 / 30f);
+                if (i % 15 != 0) continue;
+                foreach (var c in eco.critters)
+                {
+                    bool onDecor = c.pos.y > Aquarium.World.Terrain.SandHeight(c.pos.x, c.pos.z) + 0.2f;
+                    bool onShip = c.pos.x > 2.5f && c.pos.x < 4.8f && c.pos.z < 0.2f;
+                    if (!onDecor || seen.Contains(c) || (shots < 4 && !onShip) || c.Status == "Прыгает") continue;
+                    seen.Add(c);
+                    var f = c.Forward; f.y = 0; f.Normalize();
+                    var side = new Vector3(f.z, 0, -f.x);
+                    var eye = c.pos + side * 0.55f + Vector3.up * 0.22f + new Vector3(0, 0, 0.25f);
+                    cam.transform.position = P(eye);
+                    cam.transform.LookAt(P(c.pos + Vector3.up * 0.03f));
+                    cam.fieldOfView = 40;
+                    Shot(cam, app, $"{Out}/walker-{shots}-{c.kind}.png", 900, 600);
+                    Debug.Log($"WALKER shot {shots}: {c.kind} {c.name} at {c.pos} ({c.Status})");
+                    shots++;
+                    break;
+                }
+            }
+        }
+
+        /// <summary>The same close view lit in turn: as built, without the sun, without the lid's shadow, without the fill
+        /// and the ambient (what each light gives).</summary>
+        public static void LightParts()
+        {
+            EditorSettings.asyncShaderCompilation = false;
+            EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
+            var cam = Camera.main;
+            cam.GetComponent<OrbitCamera>().enabled = false;
+            Object.FindAnyObjectByType<AquariumClock>().Apply(12);
+            var day = Object.FindAnyObjectByType<DayCycle>();
+            day.mode = DayCycle.Mode.Day; day.Snap();
+            var app = Object.FindAnyObjectByType<Aquarium.Fish.AquariumApp>();
+            app.Boot(new Aquarium.Life.MemoryWorldStore());
+            UnityEngine.Random.InitState(7);
+            for (int i = 0; i < 300; i++) app.Simulate(1 / 30f);
+            Directory.CreateDirectory(Out);
+            cam.transform.position = P(1.0f, 1.9f, 4.6f);
+            cam.transform.LookAt(P(2.6f, 1.0f, -0.6f));
+            var lid = GameObject.Find("Tank").GetComponentsInChildren<MeshRenderer>().Where(r => r.name.StartsWith("Lid") || r.name == "Cover" || r.name.StartsWith("Led")).ToArray();
+            void Variant(string name, System.Action on, System.Action off) { on(); Shot(cam, app, $"{Out}/light-{name}.png", 1200, 700); off(); }
+            Variant("as-built", () => { }, () => { });
+            Variant("no-sun", () => day.sun.enabled = false, () => day.sun.enabled = true);
+            Variant("no-lid-shadow", () => { foreach (var r in lid) r.shadowCastingMode = ShadowCastingMode.Off; }, () => { foreach (var r in lid) r.shadowCastingMode = ShadowCastingMode.On; });
+            Variant("sun-only", () => { day.fill.enabled = false; RenderSettings.ambientMode = AmbientMode.Flat; RenderSettings.ambientLight = Color.black; foreach (var r in lid) r.shadowCastingMode = ShadowCastingMode.Off; },
+                () => { day.fill.enabled = true; day.Snap(); foreach (var r in lid) r.shadowCastingMode = ShadowCastingMode.On; });
+            Debug.Log("LIGHT parts: " + string.Join(", ", lid.Select(r => $"{r.name} {r.shadowCastingMode}")) + $"; sun {day.sun.intensity:0.00} at {day.sun.transform.forward}, fill {day.fill.intensity:0.00}");
+        }
+
+        /// <summary>Views given from outside, in the web version's coordinates: AQ_VIEW="name:x,y,z>x,y,z;name:...".
+        /// Fish keep away (none drawn) so the decor itself shows.</summary>
+        public static void Views()
+        {
+            EditorSettings.asyncShaderCompilation = false;
+            EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
+            var cam = Camera.main;
+            cam.GetComponent<OrbitCamera>().enabled = false;
+            Object.FindAnyObjectByType<AquariumClock>().Apply(12);
+            var day = Object.FindAnyObjectByType<DayCycle>();
+            day.mode = DayCycle.Mode.Day; day.Snap();
+            Directory.CreateDirectory(Out);
+            Vector3 V(string t) { var f = t.Split(',').Select(x => float.Parse(x, System.Globalization.CultureInfo.InvariantCulture)).ToArray(); return new Vector3(f[0], f[1], f[2]); }
+            foreach (var view in (System.Environment.GetEnvironmentVariable("AQ_VIEW") ?? "").Split(';').Where(v => v.Contains(':')))
+            {
+                var name = view.Split(':')[0];
+                var ends = view.Split(':')[1].Split('>');
+                cam.transform.position = P(V(ends[0]));
+                cam.transform.LookAt(P(V(ends[1])));
+                cam.fieldOfView = 40;
+                Object.FindAnyObjectByType<GodRays>()?.Face(cam.transform.position);
+                Save(cam, $"{Out}/view-{name}.png", 1400, 900);
+            }
+            Debug.Log("Views rendered");
         }
 
         // instanced draws pile up within one frame, so one fish per run comes out clean: AQ_FISH=betta
