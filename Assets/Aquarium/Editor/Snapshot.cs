@@ -61,6 +61,9 @@ namespace Aquarium.EditorTools
             Debug.Log("Snapshots rendered");
         }
 
+        // instanced draws pile up within one frame, so one fish per run comes out clean: AQ_FISH=betta
+        static string[] Only(params string[] all) => System.Environment.GetEnvironmentVariable("AQ_FISH")?.Split(',') ?? all;
+
         /// <summary>A strip of frames following one fish from the side, to check how it swims.</summary>
         public static void FishStrip()
         {
@@ -73,7 +76,7 @@ namespace Aquarium.EditorTools
             UnityEngine.Random.InitState(3);
             for (int i = 0; i < 300; i++) app.Simulate(1 / 30f);
             Directory.CreateDirectory("Logs/strip");
-            foreach (var sp in new[] { "goldfish", "neon", "angelfish", "betta" })
+            foreach (var sp in Only("goldfish", "neon", "angelfish", "betta"))
             {
                 var f = app.Eco.fish.Find(x => x.sp.id == sp && !x.hidden);
                 if (f == null) continue;
@@ -103,10 +106,10 @@ namespace Aquarium.EditorTools
             var set = AssetDatabase.LoadAssetAtPath<Aquarium.Fish.FishModelSet>(FishModelBuilder.SetPath);
             Directory.CreateDirectory("Logs/rest");
             var at = new Vector3(0, 3.5f, 2.2f);
-            foreach (var key in new[] { "goldfish", "neon", "angelfish" })
+            foreach (var key in Only("goldfish", "neon", "angelfish"))
             {
                 var m = set.Get(key);
-                float len = Aquarium.Fish.FishSpecies.All[key].len;
+                float len = Aquarium.Fish.FishSpecies.All[key.Split('-')[0]].len;
                 foreach (var (tag, pect) in new[] { ("rest", 0f), ("paddle", 1.2f) })
                 foreach (var (view, offset) in new[] { ("side", new Vector3(-len * 2.5f, 0, 0)), ("top", new Vector3(0, len * 2.5f, 0.001f)) })
                 {
@@ -196,7 +199,7 @@ namespace Aquarium.EditorTools
             cam.GetComponent<OrbitCamera>().enabled = false;
             var app = Object.FindAnyObjectByType<Aquarium.Fish.AquariumApp>();
             app.Boot(new Aquarium.Life.MemoryWorldStore());
-            UnityEngine.Random.InitState(4);
+            UnityEngine.Random.InitState(int.TryParse(System.Environment.GetEnvironmentVariable("AQ_SEED"), out var seed) ? seed : 4);
             for (int i = 0; i < 600; i++) app.Simulate(1 / 30f);
             app.Eco.Feed(0);
             for (int i = 0; i < 450; i++) app.Simulate(1 / 30f);

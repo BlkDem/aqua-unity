@@ -24,6 +24,30 @@ PRESETS = {
                   variants=["#ff6a3d", "#ffb21f", "#3f8cff", "#ff3fa4", "#8a5bff", "#28d6a8", "#ff2f2f"]),
     # "colorful fish 3d model (1).glb": sculpted nose to -x
     "neon": dict(len=0.34, flip=True, nose=0.49, peduncle=-0.22, spine=0.33, cut=0.10, pect_x=(0.09, 0.25), body_tris=7000, pect_tris=400),
+    # "orange goldfish 3d model.glb": the bulging eyes stick out as far as the pectorals, which hang
+    # lower, so the cut stops below the eyes (pect_zmax)
+    "goldfish": dict(len=0.85, nose=0.49, peduncle=-0.063, spine=0.44, cut=0.10, pect_x=(0.12, 0.44), pect_zmax=0.42,
+                     body_tris=14000, pect_tris=900),
+    # "ca5ed81c3251a08f15cc3ac957224fbe.glb": a halfmoon betta
+    "betta": dict(len=0.42, nose=0.541, peduncle=-0.13, spine=0.69, cut=0.08, pect_x=(0.10, 0.33),
+                  body_tris=14000, pect_tris=600),
+    # "5e397364550eaa3053cdbec0e5c196e4.glb": an oscar. Variants: its own
+    # orange markings, then turned yellow
+    "cichlid": dict(len=0.58, nose=0.567, peduncle=-0.33, spine=0.38, cut=0.09, pect_x=(-0.05, 0.25),
+                    body_tris=12000, pect_tris=600, ref="#ff5a1a", variants=["#ff5a1a", "#ffd21f"]),
+    # "529fec33468e891fd614debb6bc0e6cf.glb": its pectorals lie flat on the narrow body, so none are cut out
+    "angelfish": dict(len=0.62, nose=0.425, peduncle=-0.08, spine=0.56, body_tris=14000),
+    # "529f45f9adc6ca50bee3f4ad32806952.glb": a tiger barb; its sides are as wide as the hanging pectorals higher up
+    "barb": dict(len=0.38, nose=0.515, peduncle=-0.37, spine=0.39, cut=0.09, pect_x=(0.07, 0.30), pect_zmax=0.33,
+                 body_tris=9000, pect_tris=500),
+    # "fish 3d model.glb": a spotted corydoras, pectorals spread low; the barbels stay out of pect_x
+    "cory": dict(len=0.42, nose=0.499, peduncle=-0.27, spine=0.21, cut=0.10, pect_x=(0.06, 0.30), body_tris=9000, pect_tris=500),
+    # "3e6d0112b3480e9978c55a903008a82b.glb": a rainbowfish, pectorals close to the body
+    "rainbow": dict(len=0.48, nose=0.57, peduncle=-0.40, spine=0.29, cut=0.064, pect_x=(0.06, 0.32), body_tris=9000, pect_tris=500),
+    # "d35dee4bf297ea65c44eef958c67f3a7.glb": a discus. Variants: its own orange with blue stripes, then
+    # turned turquoise (the stripes go red)
+    "discus": dict(len=0.6, nose=0.537, peduncle=-0.33, spine=0.62, cut=0.076, pect_x=(0.02, 0.30), body_tris=14000, pect_tris=500,
+                   ref="#ff6a1f", variants=["#ff6a1f", "#2ad4c8"]),
 }
 P0 = 0.45   # typical pectoral angle the shader applies
 
@@ -37,6 +61,10 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=src, merge_vertices=True)
 ob = [o for o in bpy.context.scene.objects if o.type == 'MESH'][0]
 ob.name = "Body"
+# some exports stand the fish up with a node rotation: bake it, so the numbers below are in world space
+bpy.context.view_layer.objects.active = ob
+ob.select_set(True)
+bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 me = ob.data
 nv = len(me.vertices)
 co = np.empty(nv * 3); me.vertices.foreach_get("co", co); co = co.reshape(-1, 3)
@@ -56,44 +84,51 @@ if cfg.get("straighten"):
     me.vertices.foreach_set("co", co.ravel())
     print("STRAIGHTENED, tail shift", round(centers[0], 4), "nose shift", round(centers[-1], 4))
 
-# pectorals: the part beyond |y| > cut connected to each fin tip
-ed = np.empty(len(me.edges) * 2, int); me.edges.foreach_get("vertices", ed); ed = ed.reshape(-1, 2)
-x0, x1 = cfg["pect_x"]
-mask = (np.abs(co[:, 1]) > cfg["cut"]) & (co[:, 0] > x0) & (co[:, 0] < x1)
-e = ed[mask[ed[:, 0]] & mask[ed[:, 1]]]
-adj = [[] for _ in range(nv)]
-for a, b in e: adj[a].append(b); adj[b].append(a)
-fin = np.zeros(nv, bool)
-ys = np.where(mask, co[:, 1], 0)
-for tip in (int(np.argmax(ys)), int(np.argmin(ys))):
-    st = [tip]; fin[tip] = True
-    while st:
-        v = st.pop()
-        for w in adj[v]:
-            if not fin[w]: fin[w] = True; st.append(w)
-print("FIN VERTS", fin.sum())
 
-pv = np.empty(len(me.loops), int); me.loops.foreach_get("vertex_index", pv)
-ls = np.empty(len(me.polygons), int); me.polygons.foreach_get("loop_start", ls)
-fsel = fin[pv[ls]] & fin[pv[ls + 1]] & fin[pv[ls + 2]]   # Tripo meshes are triangles
-bpy.context.view_layer.objects.active = ob
-ob.select_set(True)
-bpy.ops.object.mode_set(mode='EDIT')
-bm = bmesh.from_edit_mesh(me)
-for seq in (bm.verts, bm.edges, bm.faces):
-    for x in seq: x.select = False
-bm.faces.ensure_lookup_table()
-for i in np.flatnonzero(fsel): bm.faces[i].select = True
-bmesh.update_edit_mesh(me)
-bpy.ops.mesh.separate(type='SELECTED')
-bpy.ops.object.mode_set(mode='OBJECT')
-fins = [o for o in bpy.context.scene.objects if o.type == 'MESH' and o is not ob][0]
-bpy.ops.object.select_all(action='DESELECT'); fins.select_set(True); bpy.context.view_layer.objects.active = fins
-bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.mesh.separate(type='LOOSE'); bpy.ops.object.mode_set(mode='OBJECT')
-parts = sorted([o for o in bpy.context.scene.objects if o.type == 'MESH' and o is not ob], key=lambda o: len(o.data.vertices), reverse=True)
-print("FIN PARTS", [len(o.data.vertices) for o in parts])
-for o in parts[2:]: bpy.data.objects.remove(o)
-pects = parts[:2]
+def cut_pectorals():
+    """The part beyond |y| > cut connected to each fin tip, as two objects."""
+    ed = np.empty(len(me.edges) * 2, int); me.edges.foreach_get("vertices", ed); ed = ed.reshape(-1, 2)
+    x0, x1 = cfg["pect_x"]
+    mask = (np.abs(co[:, 1]) > cfg["cut"]) & (co[:, 0] > x0) & (co[:, 0] < x1)
+    mask &= co[:, 2] < cfg.get("pect_zmax", np.inf)
+    e = ed[mask[ed[:, 0]] & mask[ed[:, 1]]]
+    adj = [[] for _ in range(nv)]
+    for a, b in e: adj[a].append(b); adj[b].append(a)
+    fin = np.zeros(nv, bool)
+    ys = np.where(mask, co[:, 1], 0)
+    for tip in (int(np.argmax(ys)), int(np.argmin(ys))):
+        st = [tip]; fin[tip] = True
+        while st:
+            v = st.pop()
+            for w in adj[v]:
+                if not fin[w]: fin[w] = True; st.append(w)
+    print("FIN VERTS", fin.sum())
+
+    pv = np.empty(len(me.loops), int); me.loops.foreach_get("vertex_index", pv)
+    ls = np.empty(len(me.polygons), int); me.polygons.foreach_get("loop_start", ls)
+    fsel = fin[pv[ls]] & fin[pv[ls + 1]] & fin[pv[ls + 2]]   # Tripo meshes are triangles
+    bpy.context.view_layer.objects.active = ob
+    ob.select_set(True)
+    bpy.ops.object.mode_set(mode='EDIT')
+    bm = bmesh.from_edit_mesh(me)
+    for seq in (bm.verts, bm.edges, bm.faces):
+        for x in seq: x.select = False
+    bm.faces.ensure_lookup_table()
+    for i in np.flatnonzero(fsel): bm.faces[i].select = True
+    bmesh.update_edit_mesh(me)
+    bpy.ops.mesh.separate(type='SELECTED')
+    bpy.ops.object.mode_set(mode='OBJECT')
+    fins = [o for o in bpy.context.scene.objects if o.type == 'MESH' and o is not ob][0]
+    bpy.ops.object.select_all(action='DESELECT'); fins.select_set(True); bpy.context.view_layer.objects.active = fins
+    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.mesh.separate(type='LOOSE'); bpy.ops.object.mode_set(mode='OBJECT')
+    parts = sorted([o for o in bpy.context.scene.objects if o.type == 'MESH' and o is not ob], key=lambda o: len(o.data.vertices), reverse=True)
+    print("FIN PARTS", [len(o.data.vertices) for o in parts])
+    for o in parts[2:]: bpy.data.objects.remove(o)
+    return parts[:2]
+
+
+# a fish whose pectorals lie flat on its sides (no pect_x) keeps them in the body
+pects = cut_pectorals() if cfg.get("pect_x") else []
 
 
 def boundary_center(o):
@@ -181,7 +216,10 @@ def hue_turned(rgb, turn):
     return out
 
 
-base, nrm = find("basecolor"), find("normal")
+nrm = find("normal")
+# Tripo names the colour map "..._basecolor"; other exports leave it the one plain image
+base = next((i for i in bpy.data.images if "basecolor" in i.name), None) or \
+    [i for i in bpy.data.images if i.size[0] and not any(k in i.name for k in ("normal", "metallic", "rough"))][0]
 for img in (base, nrm): img.scale(1024, 1024)
 nrm.filepath_raw = f"{tex}/{name}_body_n.png"; nrm.file_format = 'PNG'; nrm.save()
 base_px = pixels(base)

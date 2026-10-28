@@ -43,6 +43,8 @@ namespace Aquarium.EditorTools
         }
 
         static Transform Node(Transform root, string name) => root.GetComponentsInChildren<Transform>().FirstOrDefault(t => t.name == name);
+        // a model that is a lone Body node comes out of glTFast as just the root, mesh and all
+        static Transform BodyNode(Transform root) => Node(root, "Body") ?? root;
 
         /// <summary>A node's mesh with its transform relative to the model root baked in.</summary>
         static Mesh Baked(Transform root, Transform node)
@@ -90,7 +92,7 @@ namespace Aquarium.EditorTools
 
         static FishModel BuildOne(string key, FishSpecies sp, Transform root)
         {
-            var parts = new List<(Mesh, Color, Vector4, bool)> { (Baked(root, Node(root, "Body")), Color.white, Vector4.zero, false) };
+            var parts = new List<(Mesh, Color, Vector4, bool)> { (Baked(root, BodyNode(root)), Color.white, Vector4.zero, false) };
             // natural eyes: coloured iris ball, big dark pupil, small specular glint
             ColorUtility.TryParseHtmlString(sp.iris, out var iris);
             foreach (var eyeName in Node(root, "EyeL") ? new[] { "EyeL", "EyeR" } : new string[0])
@@ -105,10 +107,12 @@ namespace Aquarium.EditorTools
             }
             // pectorals paddled around their pivots. The model is mirrored on the way into Unity
             // (glTFast), so the paddle direction is too: the left fin (web -1) is +1 here.
+            // A sculpt whose pectorals lie flat on its sides has none: they stay in the body.
             var pects = new List<(Mesh, Color, Vector4, bool)>();
             foreach (var (pectName, side) in new[] { ("PectL", 1f), ("PectR", -1f) })
             {
                 var node = Node(root, pectName);
+                if (!node) continue;
                 var pivot = root.InverseTransformPoint(node.position);
                 pects.Add((Baked(root, node), Color.white, new Vector4(side, pivot.x, pivot.y, pivot.z), false));
             }
@@ -116,7 +120,7 @@ namespace Aquarium.EditorTools
             if (!finNode) parts.AddRange(pects);
             var body = Save(Combine(parts, $"{key}_body"));
 
-            var srcBody = Node(root, "Body").GetComponent<MeshRenderer>().sharedMaterial;
+            var srcBody = BodyNode(root).GetComponent<MeshRenderer>().sharedMaterial;
             var shader = Shader.Find("Aquarium/Fish");
             var bm = new Material(shader) { enableInstancing = true };
             bm.SetTexture("_BaseMap", TextureStore.Get(srcBody.GetTexture("baseColorTexture"), TexKind.Color));

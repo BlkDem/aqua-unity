@@ -29,6 +29,8 @@ namespace Aquarium.EditorTools
             if (!path.StartsWith(Models) || !path.EndsWith(".glb")) return src;
             string dir = $"{Out}/{path.Substring(Models.Length, path.Length - Models.Length - 4)}";
             string stem = $"{dir}/{Safe(src.name)}", file = File.Exists(stem + ".png") ? stem + ".png" : stem + ".jpg";
+            // a model re-exported since (a new sculpt in place of the old one) gets its textures anew
+            if (File.Exists(file) && File.GetLastWriteTimeUtc(path) > File.GetLastWriteTimeUtc(file)) AssetDatabase.DeleteAsset(file);
             if (!File.Exists(file))
             {
                 Directory.CreateDirectory(dir);
