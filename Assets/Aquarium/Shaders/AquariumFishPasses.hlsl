@@ -102,13 +102,15 @@ void FinMotion(float code, float L, float4 A, float4 B, inout float3 p)
     float u = saturate((code - type) / 0.98);
     float act = A.z;
     // every soft fin flickers at the rim: a small fast wave running out from the root
-    float flick = sin(A.x * 2.3 - u * 4.0 + p.z * 11.0 / L + p.y * 7.0 / L) * pow(u, 1.6) * L * (0.004 + 0.012 * act);
+    float flick = sin(A.x * 2.3 - u * 4.0 + p.z * 11.0 / L + p.y * 7.0 / L) * pow(u, 1.4) * L * (0.012 + 0.03 * act);
     float side = p.x >= 0.0 ? 1.0 : -1.0;
     if (type < 1.5)
     {
         // tail: the rays fan out and close up, the rim flutters
-        p.y *= 1.0 + A.w * 0.14 * u;
-        p.x += flick * 1.4 + sin(A.x * 1.7 - abs(p.y) * 9.0 / L) * u * u * L * 0.008 * act;
+        // seen from the side: the fan keeps opening and closing a little, a wave runs along its rim
+        p.y *= 1.0 + (A.w * 0.2 + 0.12 * act * sin(A.x * 0.9)) * u;
+        p.z += u * L * 0.025 * act * sin(A.x * 0.7 + p.y * 6.0 / L);
+        p.x += flick * 1.5 + sin(A.x * 1.7 - abs(p.y) * 9.0 / L) * u * u * L * 0.035 * act;
     }
     else if (type < 3.5)
     {
@@ -116,19 +118,25 @@ void FinMotion(float code, float L, float4 A, float4 B, inout float3 p)
         float s = type < 2.5 ? 1.0 : -1.0, fold = 1.0 - A.y, h = abs(p.y);
         p.y -= s * fold * 0.45 * u * h;
         p.z -= fold * 0.3 * u * h;
-        p.x += sin(A.x - p.z * 14.0 / L + s * 0.9) * pow(u, 1.3) * L * (0.008 + 0.022 * act) + flick;
+        p.x += sin(A.x - p.z * 12.0 / L + s * 0.9) * pow(u, 1.2) * L * (0.03 + 0.07 * act) + flick;
+        // seen from the side: the rays rise and fall one after another, the fin rocks to and fro
+        p.y += s * pow(u, 1.2) * L * (0.02 + 0.04 * act) * sin(A.x * 0.8 - p.z * 10.0 / L);
+        p.z += u * L * 0.03 * act * sin(A.x * 0.6 + s);
     }
     else if (type < 4.5)
     {
         // pelvic pair: beating out and in by turns, spread wide to brake and hover
-        p.x += side * u * L * (0.03 * B.z + 0.012 * act * sin(B.w + side * 1.3)) + flick * 0.5;
+        p.x += side * u * L * (0.07 * B.z + 0.06 * act * sin(B.w + side * 1.3)) + flick * 0.6;
+        p.z += u * L * 0.07 * act * cos(B.w + side * 1.3);
+        p.y += u * L * 0.03 * act * sin(B.w + side * 1.3);
     }
     else
     {
         // pectoral left in the body: sculls out and back with its side's angle
         float a = side > 0.0 ? B.x : B.y;
-        p.x += side * u * L * 0.08 * a + flick * 0.5;
-        p.z -= u * L * 0.04 * abs(a);
+        p.x += side * u * L * 0.22 * a + flick * 0.6;
+        p.z -= u * L * 0.08 * abs(a);
+        p.y += u * L * 0.05 * a;
     }
 }
 

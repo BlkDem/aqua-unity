@@ -96,6 +96,52 @@ namespace Aquarium.EditorTools
             Debug.Log("Strip rendered");
         }
 
+        /// <summary>
+        /// A fish holding station, its fins fully busy: frames 1/10 s apart, side and top, each drawn
+        /// in a place of its own (instanced draws pile up within a frame), into Logs/sweep.
+        /// AQ_FISH picks the models.
+        /// </summary>
+        public static void FinSweep()
+        {
+            EditorSettings.asyncShaderCompilation = false;
+            EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
+            var cam = Camera.main;
+            cam.GetComponent<OrbitCamera>().enabled = false;
+            var set = AssetDatabase.LoadAssetAtPath<Aquarium.Fish.FishModelSet>(FishModelBuilder.SetPath);
+            Directory.CreateDirectory("Logs/sweep");
+            var at = new Vector3(0, 3.5f, 2.2f);
+            foreach (var key in Only("goldfish", "betta"))
+            {
+                var m = set.Get(key);
+                float len = Aquarium.Fish.FishSpecies.All[key.Split('-')[0]].len;
+                // an ordinary renderer per frame, so the frames do not pile up
+                var go = new GameObject("sweep", typeof(MeshFilter), typeof(MeshRenderer));
+                go.transform.position = at;
+                go.GetComponent<MeshFilter>().sharedMesh = m.body;
+                var mr = go.GetComponent<MeshRenderer>();
+                mr.sharedMaterial = m.bodyMaterial;
+                for (int k = 0; k < 8; k++)
+                {
+                    float t = k * 0.1f;
+                    var props = new MaterialPropertyBlock();
+                    props.SetVector("_Wag", new Vector4(t * 8.4f, 0.015f * len, 0, len));
+                    props.SetFloat("_Pect", 0.6f + Mathf.Sin(t * 9) * 0.5f);
+                    props.SetVector("_Tint", Vector4.one);
+                    props.SetVector("_FinA", new Vector4(t * 10, 1, 1, 0.5f + 0.5f * Mathf.Sin(t * 3)));
+                    props.SetVector("_FinB", new Vector4(0.35f * Mathf.Sin(t * 4.5f), -0.35f * Mathf.Sin(t * 4.5f), 0.6f, t * 6.5f));
+                    mr.SetPropertyBlock(props);
+                    foreach (var (view, offset) in new[] { ("side", new Vector3(-len * 2.6f, 0, 0)), ("top", new Vector3(0, len * 2.6f, 0.001f)) })
+                    {
+                        cam.transform.position = at + offset;
+                        cam.transform.LookAt(at);
+                        Save(cam, $"Logs/sweep/{key}-{view}-{k}.png", 360, 300);
+                    }
+                }
+                Object.DestroyImmediate(go);
+            }
+            Debug.Log("Sweep rendered");
+        }
+
         /// <summary>One fish model at rest (no wave, fins still) and paddling, from the side and from above.</summary>
         public static void FishRest()
         {

@@ -1013,10 +1013,10 @@ namespace Aquarium.Fish
             // a little (more when slow, less when it has way on) and its fins keep catching it
             float still = Mathf.Clamp01(1 - rel * 1.4f);
             float wob = (0.35f + 0.65f * still) * (sleeping ? 0.35f : 1) * (0.7f + 0.6f * p("activity"));
-            float slowness = 0.6f + 0.8f / (1 + sp.len);   // small fish sway quicker
-            float rollJ = Wobble(0, 0.9f * slowness) * 0.06f * wob;
-            float pitchJ = Wobble(1, 0.7f * slowness) * 0.045f * wob;
-            float yawJ = Wobble(2, 0.6f * slowness) * 0.05f * wob;
+            float slowness = 1.0f + 1.3f / (1 + sp.len);   // small fish sway quicker
+            float rollJ = Wobble(0, 0.9f * slowness) * 0.1f * wob;
+            float pitchJ = Wobble(1, 0.7f * slowness) * 0.07f * wob;
+            float yawJ = Wobble(2, 0.6f * slowness) * 0.08f * wob;
             var q = Quaternion.LookRotation(heading, Up) * Quaternion.AngleAxis(yawJ * Mathf.Rad2Deg, Vector3.up)
                 * Quaternion.AngleAxis(pitchJ * Mathf.Rad2Deg, Vector3.right) * Quaternion.AngleAxis((roll + rollJ) * Mathf.Rad2Deg, Vector3.forward);
             rotation = Quaternion.Slerp(rotation, q, 1 - Mathf.Exp(-10 * dt));
@@ -1043,7 +1043,7 @@ namespace Aquarium.Fish
             pectS += (Mathf.Max(Mathf.Max(hover * 0.6f, pectF), idleScull) - pectS) * Mathf.Min(1, dt * 3);
             pectB += (pectBrake - pectB) * Mathf.Min(1, dt * 3);
             finPhase += dt * (4 + pectS * 6);
-            pect = 0.35f + hover * 0.25f + pectB * 0.6f + Mathf.Sin(finPhase) * (0.12f + pectS * 0.45f) + flare * 0.5f;
+            pect = 0.35f + hover * 0.25f + pectB * 0.6f + Mathf.Sin(finPhase) * (0.2f + pectS * 0.5f) + flare * 0.5f;
             AnimateFins(dt, rel, still, sleeping, rollJ, yawJ);
             // growing up: the body follows the age-dependent size smoothly
             if (Mathf.Abs(targetScale - scale) > 1e-4f)
@@ -1071,9 +1071,9 @@ namespace Aquarium.Fish
             var S = sp.swim;
             float turnN = Mathf.Clamp(yawRate / (S.turn * 0.6f), -1, 1);
             float steady = rollJ * 5 + yawJ * 3;
-            float alt = (0.08f + 0.2f * pectS) * still;
-            float l = Mathf.Max(0, -turnN) * 0.5f - steady + alt * Mathf.Sin(finPhase * 0.5f);
-            float r = Mathf.Max(0, turnN) * 0.5f + steady + alt * Mathf.Sin(finPhase * 0.5f + Mathf.PI);
+            float alt = (0.2f + 0.35f * pectS) * (0.3f + 0.7f * still);
+            float l = Mathf.Max(0, -turnN) * 0.7f - steady + alt * Mathf.Sin(finPhase * 0.5f);
+            float r = Mathf.Max(0, turnN) * 0.7f + steady + alt * Mathf.Sin(finPhase * 0.5f + Mathf.PI);
 
             bool showing = flare > 0.05f || state == FishState.DEFEND || state == FishState.STANDOFF || state == FishState.COURT
                 || state == FishState.CURIOUS || state == FishState.INVESTIGATE;
