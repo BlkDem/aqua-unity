@@ -7,7 +7,8 @@ pectorals into the body and draws no fin mesh.
 
   blender -b -P Tools/tripo_fish.py -- <preset> <tripo.glb> <out dir> <texture dir>
 
-Then Aquarium -> Build Fish Models. The numbers in PRESETS are measured on each model (Tripo
+Then mark the fins (the web version's tools/fin_map.py, run on the GLBs written here) and
+Aquarium -> Build Fish Models. The numbers in PRESETS are measured on each model (Tripo
 units: x nose, y side, z up, after `flip` for a model sculpted nose to -x). A preset with colour variants writes one GLB per variant, the
 texture's hue turned so the reference colour becomes the variant's.
 """

@@ -55,29 +55,31 @@ namespace Aquarium.EditorTools
             mesh.vertices = src.vertices.Select(v => m.MultiplyPoint3x4(v)).ToArray();
             mesh.normals = src.normals.Select(n => m.MultiplyVector(n).normalized).ToArray();
             if (src.uv.Length > 0) mesh.uv = src.uv;
+            if (src.uv2.Length > 0) mesh.uv2 = src.uv2;   // the fin marks (tools/fin_map.py, TEXCOORD_1)
             mesh.triangles = src.triangles;
             return mesh;
         }
 
         static Mesh Combine(List<(Mesh mesh, Color color, Vector4 pect, bool eyeUV)> parts, string name)
         {
-            var v = new List<Vector3>(); var n = new List<Vector3>(); var uv = new List<Vector2>(); var c = new List<Color>(); var p = new List<Vector4>(); var t = new List<int>();
+            var v = new List<Vector3>(); var n = new List<Vector3>(); var uv = new List<Vector2>(); var c = new List<Color>(); var p = new List<Vector4>(); var fin = new List<Vector4>(); var t = new List<int>();
             foreach (var (mesh, color, pect, eye) in parts)
             {
                 int b = v.Count;
                 v.AddRange(mesh.vertices);
                 n.AddRange(mesh.normals);
-                var muv = mesh.uv;
+                var muv = mesh.uv; var mfin = mesh.uv2;
                 for (int i = 0; i < mesh.vertexCount; i++)
                 {
                     uv.Add(eye || muv.Length == 0 ? EyeUV : muv[i]);
                     c.Add(color);
                     p.Add(pect);
+                    fin.Add(new Vector4(mfin.Length > 0 ? mfin[i].x : 0, 0, 0, 0));
                 }
                 t.AddRange(mesh.triangles.Select(i => i + b));
             }
             var m = new Mesh { name = name, indexFormat = v.Count > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16 };
-            m.SetVertices(v); m.SetNormals(n); m.SetUVs(0, uv); m.SetColors(c); m.SetUVs(2, p); m.SetTriangles(t, 0);
+            m.SetVertices(v); m.SetNormals(n); m.SetUVs(0, uv); m.SetColors(c); m.SetUVs(2, p); m.SetUVs(3, fin); m.SetTriangles(t, 0);
             m.RecalculateTangents();
             m.RecalculateBounds();
             return m;

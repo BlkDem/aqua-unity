@@ -81,6 +81,11 @@ namespace Aquarium.Fish
         public Vector3 scaleXYZ = Vector3.one;
         public Vector4 wag;
         public float pect = 0.55f;
+        // the solid fins (shader _FinA, _FinB): fin phase, dorsal/anal erect, fin activity, tail spread;
+        // left and right pectoral extra angle, pelvic spread, pelvic beat phase
+        public Vector4 finA = new Vector4(0, 1, 0.5f, 0), finB;
+        float erect = 1, finAct = 0.5f, tailSpread, pelvic, finRipple, pelvicPhase;
+        readonly float[] wobPhase = new float[9];
 
         public float p(string trait) => rec.Traits.TryGetValue(trait, out var v) ? (float)v : 0.5f;
 
@@ -105,6 +110,9 @@ namespace Aquarium.Fish
             idleScull = 0.35f * Mathf.Clamp01(1 - sp.swim.cruise / sp.len / 1.5f);
             phase = (float)R.Next() * 10;
             finPhase = (float)R.Next() * 10;
+            finRipple = (float)R.Next() * 10;
+            pelvicPhase = (float)R.Next() * 10;
+            for (int k = 0; k < wobPhase.Length; k++) wobPhase[k] = (float)R.Next() * 6.283f;
             burstT = Rnd.R(0, 2);
             hunger = Rnd.R(0.2f, 0.6f);
             stateDur = Rnd.R(3, 8);
@@ -985,20 +993,36 @@ namespace Aquarium.Fish
             pos.y = Mathf.Clamp(pos.y, hf, ceil + 0.05f);
         }
 
+        /// <summary>A smooth, never-repeating sway in about -1..1: three incommensurate sines.</summary>
+        float Wobble(int k, float f)
+        {
+            float t = eco.time;
+            return 0.55f * Mathf.Sin(t * f + wobPhase[k * 3]) + 0.3f * Mathf.Sin(t * f * 1.73f + wobPhase[k * 3 + 1]) + 0.15f * Mathf.Sin(t * f * 2.91f + wobPhase[k * 3 + 2]);
+        }
+
         // ------------------------------------------------------------------ animate
         void Animate(float dt)
         {
             var S = sp.swim;
             float speed = vel.magnitude;
+            float rel = speed / S.cruise;
             float roll = Mathf.Clamp(-yawRate * 0.12f, -0.5f, 0.5f);
             bool sleeping = state == FishState.REST && eco.night > 0.6f && !sp.nocturnal;
             if (sleeping) roll += 0.12f;
-            var q = Quaternion.LookRotation(heading, Up) * Quaternion.AngleAxis(roll * Mathf.Rad2Deg, Vector3.forward);
+            // a fish never just hangs in the water: holding still it keeps rolling, pitching and yawing
+            // a little (more when slow, less when it has way on) and its fins keep catching it
+            float still = Mathf.Clamp01(1 - rel * 1.4f);
+            float wob = (0.35f + 0.65f * still) * (sleeping ? 0.35f : 1) * (0.7f + 0.6f * p("activity"));
+            float slowness = 0.6f + 0.8f / (1 + sp.len);   // small fish sway quicker
+            float rollJ = Wobble(0, 0.9f * slowness) * 0.06f * wob;
+            float pitchJ = Wobble(1, 0.7f * slowness) * 0.045f * wob;
+            float yawJ = Wobble(2, 0.6f * slowness) * 0.05f * wob;
+            var q = Quaternion.LookRotation(heading, Up) * Quaternion.AngleAxis(yawJ * Mathf.Rad2Deg, Vector3.up)
+                * Quaternion.AngleAxis(pitchJ * Mathf.Rad2Deg, Vector3.right) * Quaternion.AngleAxis((roll + rollJ) * Mathf.Rad2Deg, Vector3.forward);
             rotation = Quaternion.Slerp(rotation, q, 1 - Mathf.Exp(-10 * dt));
 
             // tail undulation: the same intensity that produces thrust. Frequency grows with intensity
             // (and so with speed); amplitude saturates. Turning on the spot takes a few tail sweeps too.
-            float rel = speed / S.cruise;
             float spin = Mathf.Min(1, Mathf.Abs(yawRate) / (S.turn * 0.6f)) * 0.5f * Mathf.Clamp01(1 - rel);
             float act = Mathf.Max(tail, spin);
             // Bainbridge: tail-beat frequency f ~ 1.33 (1 + U/L) Hz, it never drops much below ~1.3 Hz;
@@ -1020,6 +1044,7 @@ namespace Aquarium.Fish
             pectB += (pectBrake - pectB) * Mathf.Min(1, dt * 3);
             finPhase += dt * (4 + pectS * 6);
             pect = 0.35f + hover * 0.25f + pectB * 0.6f + Mathf.Sin(finPhase) * (0.12f + pectS * 0.45f) + flare * 0.5f;
+            AnimateFins(dt, rel, still, sleeping, rollJ, yawJ);
             // growing up: the body follows the age-dependent size smoothly
             if (Mathf.Abs(targetScale - scale) > 1e-4f)
             {
@@ -1033,6 +1058,41 @@ namespace Aquarium.Fish
                 float s = 1 + Mathf.Sin(gulp * Mathf.PI) * 0.08f;
                 scaleXYZ = new Vector3(scale * s, scale * s, scale * (2 - s));
             }
+        }
+
+        /// <summary>
+        /// The other fins. Pectorals: the one inside a turn opens out, and holding station they stroke
+        /// by turns and answer the body's sway. Dorsal and anal fins stand up when slow, curious or
+        /// showing off and fold down at speed or while gliding. The tail fans out to brake, the
+        /// pelvic pair spreads to brake and hover. All of them stay busier the slower the fish goes.
+        /// </summary>
+        void AnimateFins(float dt, float rel, float still, bool sleeping, float rollJ, float yawJ)
+        {
+            var S = sp.swim;
+            float turnN = Mathf.Clamp(yawRate / (S.turn * 0.6f), -1, 1);
+            float steady = rollJ * 5 + yawJ * 3;
+            float alt = (0.08f + 0.2f * pectS) * still;
+            float l = Mathf.Max(0, -turnN) * 0.5f - steady + alt * Mathf.Sin(finPhase * 0.5f);
+            float r = Mathf.Max(0, turnN) * 0.5f + steady + alt * Mathf.Sin(finPhase * 0.5f + Mathf.PI);
+
+            bool showing = flare > 0.05f || state == FishState.DEFEND || state == FishState.STANDOFF || state == FishState.COURT
+                || state == FishState.CURIOUS || state == FishState.INVESTIGATE;
+            float erectT = Mathf.Lerp(1, 0.3f, Mathf.Clamp01((rel - 0.5f) / 1.1f));
+            if (burst <= 0 && tail < 0.25f && rel > 0.9f) erectT = Mathf.Min(erectT, 0.35f);   // gliding
+            if (showing) erectT = 1;
+            if (sleeping) erectT = 0.55f;
+            float actT = (0.35f + 0.6f * still + 0.25f * pectB + 0.3f * flare) * (sleeping ? 0.35f : 1);
+            float spreadT = Mathf.Clamp(0.5f * still + pectB + 0.5f * flare - 0.6f * Mathf.Clamp01(rel - 0.8f), -0.6f, 1);
+            float pelvicT = Mathf.Clamp01(0.55f * still + 0.9f * pectB + 0.3f * Mathf.Abs(turnN) + 0.4f * flare);
+            float k = Mathf.Min(1, dt * 3);
+            erect += (erectT - erect) * k;
+            finAct += (actT - finAct) * Mathf.Min(1, dt * 2);
+            tailSpread += (spreadT - tailSpread) * k;
+            pelvic += (pelvicT - pelvic) * k;
+            finRipple += dt * (5 + 5 * finAct);
+            pelvicPhase += dt * (2.5f + 4 * finAct);
+            finA = new Vector4(finRipple, erect, finAct, tailSpread);
+            finB = new Vector4(l, r, pelvic, pelvicPhase);
         }
 
         public void Update(float dt)

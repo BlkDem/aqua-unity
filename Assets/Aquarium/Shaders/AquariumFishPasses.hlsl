@@ -1,7 +1,12 @@
 // Passes of Aquarium/Fish: the body bends around a spine (a travelling wave, head to tail), the
 // caudal fin pivots at the peduncle with a lag towards its tip, soft fins ripple and the
 // pectorals paddle around their roots. Ported from the web version's shaderPatch.js.
-// Per fish (instanced): _Wag = (phase, amplitude, turn bend, body length), _Pect, _Tint.
+// The solid fins of a sculpted model (marked by the web version's tools/fin_map.py) keep moving
+// on their own: the dorsal and anal fins carry a wave and fold down at speed, the tail fans and
+// its rim flutters, the pelvic pair beats and spreads to brake, every rim flickers a little.
+// Per fish (instanced): _Wag = (phase, amplitude, turn bend, body length), _Pect, _Tint,
+// _FinA = (fin phase, dorsal/anal erect 0..1, fin activity 0..1, tail spread -1..1),
+// _FinB = (left and right pectoral extra angle, pelvic spread 0..1, pelvic beat phase).
 #ifndef AQUARIUM_FISH_PASSES_INCLUDED
 #define AQUARIUM_FISH_PASSES_INCLUDED
 
@@ -25,6 +30,8 @@ UNITY_INSTANCING_BUFFER_START(FishProps)
     UNITY_DEFINE_INSTANCED_PROP(float4, _Wag)
     UNITY_DEFINE_INSTANCED_PROP(float, _Pect)
     UNITY_DEFINE_INSTANCED_PROP(float4, _Tint)
+    UNITY_DEFINE_INSTANCED_PROP(float4, _FinA)
+    UNITY_DEFINE_INSTANCED_PROP(float4, _FinB)
 UNITY_INSTANCING_BUFFER_END(FishProps)
 
 static const float FISH_K = 5.4;   // wave number * L: a bit over one body length per wave
@@ -82,21 +89,62 @@ struct FishAttributes
     float4 tangentOS : TANGENT;
     float2 uv : TEXCOORD0;
     float4 pect : TEXCOORD2;   // x: paddle direction (0 = not a pectoral), yzw: fin root
+    float4 fin : TEXCOORD3;    // x: fin type + 0.98 u (0 body, 1 tail, 2 dorsal, 3 anal, 4 pelvic, 5 pectoral)
     half4 color : COLOR;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
+
+// a solid fin moving on its own, before the body wave carries it along
+void FinMotion(float code, float L, float4 A, float4 B, inout float3 p)
+{
+    float type = floor(code + 1e-3);
+    if (type < 0.5) return;
+    float u = saturate((code - type) / 0.98);
+    float act = A.z;
+    // every soft fin flickers at the rim: a small fast wave running out from the root
+    float flick = sin(A.x * 2.3 - u * 4.0 + p.z * 11.0 / L + p.y * 7.0 / L) * pow(u, 1.6) * L * (0.004 + 0.012 * act);
+    float side = p.x >= 0.0 ? 1.0 : -1.0;
+    if (type < 1.5)
+    {
+        // tail: the rays fan out and close up, the rim flutters
+        p.y *= 1.0 + A.w * 0.14 * u;
+        p.x += flick * 1.4 + sin(A.x * 1.7 - abs(p.y) * 9.0 / L) * u * u * L * 0.008 * act;
+    }
+    else if (type < 3.5)
+    {
+        // dorsal (2) and anal (3): a wave runs front to back along the fin; folded down and back at speed
+        float s = type < 2.5 ? 1.0 : -1.0, fold = 1.0 - A.y, h = abs(p.y);
+        p.y -= s * fold * 0.45 * u * h;
+        p.z -= fold * 0.3 * u * h;
+        p.x += sin(A.x - p.z * 14.0 / L + s * 0.9) * pow(u, 1.3) * L * (0.008 + 0.022 * act) + flick;
+    }
+    else if (type < 4.5)
+    {
+        // pelvic pair: beating out and in by turns, spread wide to brake and hover
+        p.x += side * u * L * (0.03 * B.z + 0.012 * act * sin(B.w + side * 1.3)) + flick * 0.5;
+    }
+    else
+    {
+        // pectoral left in the body: sculls out and back with its side's angle
+        float a = side > 0.0 ? B.x : B.y;
+        p.x += side * u * L * 0.08 * a + flick * 0.5;
+        p.z -= u * L * 0.04 * abs(a);
+    }
+}
 
 // the moving fish in object space
 void FishDeform(FishAttributes i, out float3 p, out float3 n)
 {
     float4 W = UNITY_ACCESS_INSTANCED_PROP(FishProps, _Wag);
+    float4 FA = UNITY_ACCESS_INSTANCED_PROP(FishProps, _FinA), FB = UNITY_ACCESS_INSTANCED_PROP(FishProps, _FinB);
     p = i.positionOS.xyz;
     n = i.normalOS;
     // pectorals paddle: in the fin mesh, or in the body of a sculpted model with solid fins
     if (i.pect.x != 0.0)
     {
         float3 q = p - i.pect.yzw;
-        float a = i.pect.x * UNITY_ACCESS_INSTANCED_PROP(FishProps, _Pect);
+        // each side has its own stroke on top of the shared one (turning, steadying the roll)
+        float a = i.pect.x * (UNITY_ACCESS_INSTANCED_PROP(FishProps, _Pect) + (i.pect.x > 0.0 ? FB.x : FB.y));
         float ca = cos(a), sa = sin(a), cx = cos(0.3), sx = sin(0.3);
         q.xz = float2(ca * q.x + sa * q.z, -sa * q.x + ca * q.z);
         n.xz = float2(ca * n.x + sa * n.z, -sa * n.x + ca * n.z);
@@ -110,6 +158,7 @@ void FishDeform(FishAttributes i, out float3 p, out float3 n)
     float finU = finTail > 0.5 ? i.uv.x * 2.0 : i.uv.x * 2.0 - 1.0;
 #else
     float finU = -1.0, finTail = 0.0;
+    FinMotion(i.fin.x, W.w, FA, FB, p);
 #endif
     p = FishBend(W, p, n, finU, finTail);
 }

@@ -11,14 +11,14 @@ namespace Aquarium.Fish
     public sealed class FishRenderer
     {
         const int Cap = 64;
-        static readonly int WagId = Shader.PropertyToID("_Wag"), PectId = Shader.PropertyToID("_Pect"), TintId = Shader.PropertyToID("_Tint"), GlowId = Shader.PropertyToID("_Glow");
+        static readonly int WagId = Shader.PropertyToID("_Wag"), PectId = Shader.PropertyToID("_Pect"), TintId = Shader.PropertyToID("_Tint"), FinAId = Shader.PropertyToID("_FinA"), FinBId = Shader.PropertyToID("_FinB"), GlowId = Shader.PropertyToID("_Glow");
 
         /// <summary>The fish of one model drawn with one level of detail this frame.</summary>
         sealed class Level
         {
             public int n;
             public readonly Matrix4x4[] matrices = new Matrix4x4[Cap];
-            public readonly Vector4[] wag = new Vector4[Cap], tint = new Vector4[Cap];
+            public readonly Vector4[] wag = new Vector4[Cap], tint = new Vector4[Cap], finA = new Vector4[Cap], finB = new Vector4[Cap];
             public readonly float[] pect = new float[Cap];
             public readonly MaterialPropertyBlock props = new MaterialPropertyBlock();
         }
@@ -80,6 +80,8 @@ namespace Aquarium.Fish
                     l.matrices[i] = Matrix4x4.TRS(pos, ToUnity(f.rotation), f.scaleXYZ);
                     l.wag[i] = new Vector4(f.wag.x, -f.wag.y, -f.wag.z, f.wag.w);
                     l.pect[i] = f.pect;
+                    l.finA[i] = f.finA;
+                    l.finB[i] = f.finB;
                     var t = f.rec.Gene.Tint;
                     l.tint[i] = new Vector4((float)t[0], (float)t[1], (float)t[2], 1);
                 }
@@ -96,6 +98,8 @@ namespace Aquarium.Fish
                     l.props.SetVectorArray(WagId, l.wag);
                     l.props.SetFloatArray(PectId, l.pect);
                     l.props.SetVectorArray(TintId, l.tint);
+                    l.props.SetVectorArray(FinAId, l.finA);
+                    l.props.SetVectorArray(FinBId, l.finB);
                     var mesh = li == 0 ? b.model.body : b.model.bodyLods[li - 1];
                     // with simpler bodies at hand, the shadows are drawn separately with the simplest
                     var body = new RenderParams(b.model.bodyMaterial) { matProps = l.props, shadowCastingMode = hasLods ? ShadowCastingMode.Off : ShadowCastingMode.On, receiveShadows = true, worldBounds = TankBounds, camera = only };

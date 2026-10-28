@@ -117,6 +117,8 @@ namespace Aquarium.EditorTools
                     props.SetVectorArray("_Wag", new[] { new Vector4(0, 0, 0, len) });
                     props.SetFloatArray("_Pect", new[] { pect });
                     props.SetVectorArray("_Tint", new[] { Vector4.one });
+                    props.SetVectorArray("_FinA", new[] { new Vector4(0, 1, 0, 0) });   // fins up, still
+                    props.SetVectorArray("_FinB", new[] { Vector4.zero });
                     var mat = new[] { Matrix4x4.TRS(at, Quaternion.identity, Vector3.one) };
                     Graphics.RenderMeshInstanced(new RenderParams(m.bodyMaterial) { matProps = props }, m.body, 0, mat, 1);
                     if (m.fins) Graphics.RenderMeshInstanced(new RenderParams(m.finMaterial) { matProps = props }, m.fins, 0, mat, 1);
