@@ -75,6 +75,9 @@ namespace Aquarium.Fish
         // FishBodies: what is left of this frame's pushing; the last touch, which it turns away from
         public float pushLeft;
         Vector3 bump;
+        // and where it was when the last frame was settled, and how far it has come since
+        public Vector3 before;
+        public float moved;
 
         // needs & mind
         public float hunger, fear, stateT, stateDur, thinkT;
@@ -891,29 +894,20 @@ namespace Aquarium.Fish
                     float d = Mathf.Sqrt(d2) + 1e-4f, f = (o.size * 1.4f - d) * 3 * (0.5f + p("shyness"));
                     acc.x -= dx / d * f; acc.y -= dy / d * f * 0.5f; acc.z -= dz / d * f;
                 }
-                // on a course into it within a second: turn aside in good time, the lighter fish more
+                // on a course into it: turn aside, the lighter fish more
                 if (FishBodies.On && d2 < 6.25f)
                 {
-                    var closing = vel - o.vel;
-                    float c2 = closing.sqrMagnitude;
-                    var toO = new Vector3(dx, dy, dz);
-                    float when = c2 > 0.01f ? Vector3.Dot(toO, closing) / c2 : -1;
-                    if (when > 0 && when < 1)
-                    {
-                        var miss = toO - closing * when;
-                        float clear = Girth + o.Girth + (size + o.size) * 0.3f;
-                        float m2 = miss.sqrMagnitude;
-                        if (m2 < clear * clear)
-                        {
-                            float md = Mathf.Sqrt(m2);
-                            // dead ahead each keeps to its own right, and they pass
-                            var away = md > 1e-3f ? -miss / md : Vector3.Cross(Up, heading).normalized;
-                            float share = 2 * o.size * o.size * o.size / (size * size * size + o.size * o.size * o.size);
-                            acc += away * ((1 - when) * (1 - md / clear) * S.accel * 2.5f * Mathf.Clamp(share, 0.3f, 1.7f));
-                        }
-                    }
+                    float share = 2 * o.size * o.size * o.size / (size * size * size + o.size * o.size * o.size);
+                    acc += Dodge(new Vector3(dx, dy, dz), vel - o.vel, Girth + o.Girth + (size + o.size) * 0.3f, Mathf.Clamp(share, 0.3f, 1.7f));
                 }
             }
+            // and into a critter: it stays where it is, so this is all up to the fish
+            if (FishBodies.On)
+                foreach (var c in eco.critters)
+                {
+                    var toC = c.pos - pos;
+                    if (toC.sqrMagnitude < 6.25f) acc += Dodge(toC, vel, Girth + size * 0.3f + c.Reach, 1.7f);
+                }
             if (bump.sqrMagnitude > 1e-4f)
             {
                 acc += bump * (S.accel * 0.8f);
@@ -1121,6 +1115,23 @@ namespace Aquarium.Fish
             pos += g * (r - d);
             float into = Vector3.Dot(vel, g);
             if (into < 0) vel -= g * into;
+        }
+
+        /// <summary>
+        /// Heading for something within a second (it lies at `to`, closing at `closing`, and has to be passed
+        /// this far off): how hard to turn aside. Dead ahead each keeps to its own right, and they pass.
+        /// </summary>
+        Vector3 Dodge(Vector3 to, Vector3 closing, float clear, float share)
+        {
+            float c2 = closing.sqrMagnitude;
+            float when = c2 > 0.01f ? Vector3.Dot(to, closing) / c2 : -1;
+            if (when <= 0 || when >= 1) return Vector3.zero;
+            var miss = to - closing * when;
+            float m2 = miss.sqrMagnitude;
+            if (m2 >= clear * clear) return Vector3.zero;
+            float md = Mathf.Sqrt(m2);
+            var away = md > 1e-3f ? -miss / md : Vector3.Cross(Up, heading).normalized;
+            return away * ((1 - when) * (1 - md / clear) * sp.swim.accel * 2.5f * share);
         }
 
         /// <summary>A smooth, never-repeating sway in about -1..1: three incommensurate sines.</summary>

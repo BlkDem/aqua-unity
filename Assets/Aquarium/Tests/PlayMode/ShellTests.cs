@@ -63,6 +63,9 @@ namespace Aquarium.PlayTests
                     for (int j = i + 1; j < fish.Count; j++)
                         if (!fish[i].hidden && !fish[j].hidden)
                             deepest = Mathf.Max(deepest, -FishBodies.Gap(fish[i], fish[j], out _));
+                foreach (var f in fish)
+                    foreach (var c in app.Eco.critters)
+                        if (!f.hidden) deepest = Mathf.Max(deepest, -FishBodies.Gap(f, c, out _));
             }
             Assert.Less(deepest, 0.15f, "bodies overlap");   // without keeping apart: over 0.5 in three minutes
         }

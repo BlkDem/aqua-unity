@@ -75,6 +75,20 @@ namespace Aquarium.Fish
         public virtual float Half => 0.07f * root.localScale.x;
         /// <summary>Which way its body faces (web space).</summary>
         public Vector3 Forward => rot * Vector3.forward;
+        /// <summary>For the fish to keep off, the body as a stick lying on the surface it stands on: how far the body
+        /// reaches around it, and half its length with the ends of that reach.</summary>
+        public virtual float Thick => 0.05f * root.localScale.x;
+        public virtual float Reach => Half;
+        protected virtual Vector3 StickWay => Forward;
+
+        /// <summary>That stick: one end, and the way to the other.</summary>
+        public void BodyAxis(out Vector3 from, out Vector3 along)
+        {
+            var way = StickWay;
+            float half = Mathf.Max(Reach - Thick, 0);
+            from = pos + rot * Vector3.up * Thick + way * half;
+            along = -way * (2 * half);
+        }
 
         /// <summary>Turn smoothly to stand on a surface with normal `up`, facing `fwd` (web space).</summary>
         protected void Orient(Vector3 up, Vector3 fwd, float k)
@@ -345,6 +359,7 @@ namespace Aquarium.Fish
         float u, v, ang, retract, t, crawl, pause;
         public override string Status => retract > 0.5f ? "Спряталась в раковину" : mode == "glass" ? "Ползёт по стеклу" : food != null ? "Ползёт к корму" : "Исследует грунт";
         public override float Half => (type == "ramshorn" ? 0.06f : 0.09f) * root.localScale.x;
+        public override float Thick => (type == "mystery" ? 0.08f : type == "nerite" ? 0.055f : 0.045f) * root.localScale.x;
         public bool reachedTop, goalTop;
         Vector3 heading = Vector3.right, normal = Vector3.up;
         Vector3? goal;
@@ -541,6 +556,10 @@ namespace Aquarium.Fish
         public override string Status => idle > 0 ? "Размышляет" : wave > 0 ? "Машет клешнями" : "Ходит боком";
         public override float size => 0.25f;
         public override float Half => 0.1f * root.localScale.x;
+        // wider than long: the stick lies across it, out to the tips of its legs
+        public override float Thick => 0.11f * root.localScale.x;
+        public override float Reach => 0.34f * root.localScale.x;
+        protected override Vector3 StickWay => rot * Vector3.right;
         Vector3? goal;
         FoodItem food;
         readonly Transform body;

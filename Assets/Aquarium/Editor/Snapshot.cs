@@ -645,6 +645,11 @@ namespace Aquarium.EditorTools
                 var sw = new System.Diagnostics.Stopwatch();
                 // a pair close together, and which side of b the body of a was on: a flip is one through the other
                 var was = new Dictionary<(int, int), Vector3>();
+                var critters = app.Eco.critters;
+                var wasC = new Dictionary<(int, int), Vector3>();
+                int critterFrames = 0, critterDeep = 0, crossedC = 0;
+                float worstC = 0;
+                string worstCPair = "";
                 for (int k = 0; k < frames; k++)
                 {
                     if (k == frames / 2) app.Eco.Feed(0);
@@ -670,6 +675,25 @@ namespace Aquarium.EditorTools
                             if (depth > worst) { worst = depth; worstPair = $"{fish[i].sp.id} {fish[i].state} / {fish[j].sp.id} {fish[j].state}"; }
                         }
                     }
+                    for (int i = 0; i < fish.Count; i++)
+                    {
+                        if (fish[i].hidden) continue;
+                        for (int c = 0; c < critters.Count; c++)
+                        {
+                            if ((fish[i].pos - critters[c].pos).sqrMagnitude > 4) continue;
+                            float depth = -Aquarium.Fish.FishBodies.Gap(fish[i], critters[c], out var side);
+                            if (depth > -0.12f)
+                            {
+                                if (wasC.TryGetValue((i, c), out var before) && Vector3.Dot(before, side) < -0.5f) crossedC++;
+                                wasC[(i, c)] = side;
+                            }
+                            else wasC.Remove((i, c));
+                            if (depth <= 0) continue;
+                            critterFrames++;
+                            if (depth > 0.05f) critterDeep++;
+                            if (depth > worstC) { worstC = depth; worstCPair = $"{fish[i].sp.id} {fish[i].state} / {critters[c].kind} {critters[c].name}"; }
+                        }
+                    }
                     if (k % 15 != 0) continue;
                     // the swimming goes on, and the schools hold together
                     foreach (var f in fish)
@@ -686,6 +710,7 @@ namespace Aquarium.EditorTools
                 float minutes = frames * Dt / 60;
                 int meals = fish.Sum(f => f.mem.meals), shown = fish.Count(f => !f.hidden);
                 Debug.Log($"OVERLAP bodies {(on ? "on" : "off")}: {shown} fish, touching {pairFrames * Dt / minutes:0.0} pair-seconds a minute, more than 0.05 deep {deepFrames * Dt / minutes:0.0}, deepest {worst:0.000} ({worstPair}), went through {crossed} times, speed {speedSum / (frames / 15 * shown):0.00} of cruise, nearest schoolmate {nearSum / Mathf.Max(1, nearN):0.00} lengths, meals {meals}, food left {app.Eco.food.Count}, pushed {Aquarium.Fish.FishBodies.Pushed / shown / (frames * Dt):0.0000} units a second per fish, simulation {sw.Elapsed.TotalMilliseconds / frames:0.00} ms a step");
+                Debug.Log($"OVERLAP critters bodies {(on ? "on" : "off")}: {critters.Count} critters, touching {critterFrames * Dt / minutes:0.0} pair-seconds a minute, more than 0.05 deep {critterDeep * Dt / minutes:0.0}, deepest {worstC:0.000} ({worstCPair}), went through {crossedC} times");
             }
             Aquarium.Fish.FishBodies.On = true;
         }

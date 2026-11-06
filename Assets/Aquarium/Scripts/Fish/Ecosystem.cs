@@ -336,8 +336,8 @@ namespace Aquarium.Fish
                 if (time >= timers[i].t) { var fn = timers[i].fn; timers.RemoveAt(i); fn(); }
             UpdateSchools(dt);
             foreach (var f in fish) f.Update(dt);
-            FishBodies.Resolve(fish, dt);
             foreach (var c in critters) c.Update(dt);
+            FishBodies.Resolve(fish, critters, dt);
             FoodItem.Update(food, dt, this);
             bubbles.Update(dt, time);
             if (time > nextDiver) { nextDiver = time + Rnd.R(10, 30); diverSrc.burst = Rnd.R(0.15f, 0.4f); }
