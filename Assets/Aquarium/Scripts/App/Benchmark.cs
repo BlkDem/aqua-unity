@@ -28,6 +28,7 @@ namespace Aquarium.App
 
         IEnumerator Start()
         {
+            Application.runInBackground = true;   // a click elsewhere must not stop the measurement
             shell = GetComponent<AquariumShell>();
             shell.benchmarking = true;
             shell.quality.SetAuto(false);
@@ -51,10 +52,14 @@ namespace Aquarium.App
                     yield return Measure(QualitySettings.names[level], name);
                 }
             }
-            shell.quality.Apply(2);
-            shell.SetMode(CameraMode.Cinematic);
-            yield return Measure(QualitySettings.names[2], "кино");
-            shell.SetMode(CameraMode.Free);
+            // with depth of field: Ultra gets its depth from a pre-pass, the others copy it
+            foreach (int level in new[] { QualitySettings.names.Length - 1, 2 })
+            {
+                shell.quality.Apply(level);
+                shell.SetMode(CameraMode.Cinematic);
+                yield return Measure(QualitySettings.names[level], "кино");
+                shell.SetMode(CameraMode.Free);
+            }
 
             long tex = 0, mesh = 0;
             int texN = 0, meshN = 0;

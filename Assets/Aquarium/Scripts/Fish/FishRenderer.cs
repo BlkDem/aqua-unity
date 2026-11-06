@@ -11,14 +11,14 @@ namespace Aquarium.Fish
     public sealed class FishRenderer
     {
         const int Cap = 64;
-        static readonly int WagId = Shader.PropertyToID("_Wag"), PectId = Shader.PropertyToID("_Pect"), TintId = Shader.PropertyToID("_Tint"), FinAId = Shader.PropertyToID("_FinA"), FinBId = Shader.PropertyToID("_FinB"), GlowId = Shader.PropertyToID("_Glow");
+        static readonly int WagId = Shader.PropertyToID("_Wag"), PectId = Shader.PropertyToID("_Pect"), TintId = Shader.PropertyToID("_Tint"), FinAId = Shader.PropertyToID("_FinA"), FinBId = Shader.PropertyToID("_FinB"), GlowId = Shader.PropertyToID("_Glow"), FaceId = Shader.PropertyToID("_Face");
 
         /// <summary>The fish of one model drawn with one level of detail this frame.</summary>
         sealed class Level
         {
             public int n;
             public readonly Matrix4x4[] matrices = new Matrix4x4[Cap];
-            public readonly Vector4[] wag = new Vector4[Cap], tint = new Vector4[Cap], finA = new Vector4[Cap], finB = new Vector4[Cap];
+            public readonly Vector4[] wag = new Vector4[Cap], tint = new Vector4[Cap], finA = new Vector4[Cap], finB = new Vector4[Cap], face = new Vector4[Cap];
             public readonly float[] pect = new float[Cap];
             public readonly MaterialPropertyBlock props = new MaterialPropertyBlock();
         }
@@ -82,6 +82,7 @@ namespace Aquarium.Fish
                     l.pect[i] = f.pect;
                     l.finA[i] = f.finA;
                     l.finB[i] = f.finB;
+                    l.face[i] = f.faceOpen;
                     var t = f.rec.Gene.Tint;
                     l.tint[i] = new Vector4((float)t[0], (float)t[1], (float)t[2], 1);
                 }
@@ -100,6 +101,7 @@ namespace Aquarium.Fish
                     l.props.SetVectorArray(TintId, l.tint);
                     l.props.SetVectorArray(FinAId, l.finA);
                     l.props.SetVectorArray(FinBId, l.finB);
+                    l.props.SetVectorArray(FaceId, l.face);
                     var mesh = li == 0 ? b.model.body : b.model.bodyLods[li - 1];
                     // with simpler bodies at hand, the shadows are drawn separately with the simplest
                     var body = new RenderParams(b.model.bodyMaterial) { matProps = l.props, shadowCastingMode = hasLods ? ShadowCastingMode.Off : ShadowCastingMode.On, receiveShadows = true, worldBounds = TankBounds, camera = only };
@@ -109,12 +111,22 @@ namespace Aquarium.Fish
                         var shadow = new RenderParams(b.model.bodyMaterial) { matProps = l.props, shadowCastingMode = ShadowCastingMode.ShadowsOnly, worldBounds = TankBounds, camera = only };
                         Graphics.RenderMeshInstanced(shadow, b.model.bodyLods[1], 0, l.matrices, l.n);
                     }
-                    if (!b.model.fins) continue;   // a sculpted model: its fins are part of the body
+                    if (!b.model.fins) continue;
                     var fins = new RenderParams(b.model.finMaterial) { matProps = l.props, shadowCastingMode = ShadowCastingMode.Off, receiveShadows = true, worldBounds = TankBounds, camera = only };
-                    Graphics.RenderMeshInstanced(fins, b.model.fins, 0, l.matrices, l.n);
+                    var finMesh = li > 0 && b.model.finLods != null && b.model.finLods.Length >= li ? b.model.finLods[li - 1] : b.model.fins;
+                    Graphics.RenderMeshInstanced(fins, finMesh, 0, l.matrices, l.n);
+                    if (!FinDepth || !set.finDepth) continue;
+                    b.model.FinDepthMaterials(set.finDepth, out var last, out var early);
+                    var depth = new RenderParams(last) { matProps = l.props, shadowCastingMode = ShadowCastingMode.Off, worldBounds = TankBounds, camera = only };
+                    Graphics.RenderMeshInstanced(depth, finMesh, 0, l.matrices, l.n);
+                    depth.material = early;
+                    Graphics.RenderMeshInstanced(depth, finMesh, 0, l.matrices, l.n);
                 }
             }
         }
+
+        /// <summary>The fins in the depth texture as well: only depth of field reads it, so only while it is on.</summary>
+        public static bool FinDepth;
 
         /// <summary>Simpler bodies for small fish (off: always the full model, e.g. for close-up tools).</summary>
         public static bool LodsOn = true;

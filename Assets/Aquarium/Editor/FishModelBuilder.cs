@@ -2,9 +2,9 @@
 // the body with cartoon-but-natural eyes (iris ball, big pupil, a glint) painted on a white
 // texel block of the body texture, and the fins with the pectorals' pivots stored per vertex
 // (uv2: paddle direction, pivot) so the shader can paddle them. A sculpted model (no Fins node,
-// e.g. the clownfish from Tripo) keeps its own eyes and solid fins: its pectorals paddle as part
-// of the body and there is no fin mesh. Saved as assets in Assets/Aquarium/Art/Generated/Fish and
-// listed in FishModels.asset.
+// e.g. the clownfish from Tripo) keeps its own eyes; its fins are cut out of the sculpt into a fin
+// mesh of thin see-through skin (FinMembrane.cs). The mouth and the gill covers: FishFace.cs. Saved as assets in
+// Assets/Aquarium/Art/Generated/Fish and listed in FishModels.asset.
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -29,6 +29,7 @@ namespace Aquarium.EditorTools
             var set = AssetDatabase.LoadAssetAtPath<FishModelSet>(SetPath);
             if (!set) { set = ScriptableObject.CreateInstance<FishModelSet>(); AssetDatabase.CreateAsset(set, SetPath); }
             set.models.Clear();
+            set.finDepth = SaveMat(new Material(Shader.Find("Aquarium/Fish Fin Depth")) { enableInstancing = true }, "fin_depth");
             foreach (var key in FishSpecies.ModelKeys())
             {
                 var src = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Aquarium/Models/Fish/{key}.glb");
@@ -120,7 +121,19 @@ namespace Aquarium.EditorTools
             }
             var finNode = Node(root, "Fins");
             if (!finNode) parts.AddRange(pects);
-            var body = Save(Combine(parts, $"{key}_body"));
+            var whole = Combine(parts, $"{key}_body");
+            Mesh membrane = null;
+            if (!finNode)
+            {
+                FinMembrane.Split(whole, key, sp.len, out var opaque, out membrane);
+                Object.DestroyImmediate(whole);
+                whole = opaque;
+            }
+            // the face only in the full mesh: the simpler ones are made without it
+            var face = FishFace.Get(key);
+            var full = face != null ? FishFace.Cut(whole, face) : Object.Instantiate(whole);
+            full.name = whole.name;
+            var body = Save(full);
 
             var srcBody = BodyNode(root).GetComponent<MeshRenderer>().sharedMaterial;
             var shader = Shader.Find("Aquarium/Fish");
@@ -133,9 +146,18 @@ namespace Aquarium.EditorTools
             bm.SetFloat("_Metallic", 0.05f);
             bm.SetFloat("_CausticStrength", 0.55f);
             if (sp.glow) bm.SetColor("_EmissionColor", WebHex("#8fe9ff") * 0.4f);
-            var model = new FishModel { key = key, body = body, bodyLods = Lods(body), bodyMaterial = SaveMat(bm, $"{key}_body") };
+            if (face != null) FishFace.SetUp(bm, face);
+            var model = new FishModel { key = key, body = body, bodyLods = Lods(whole, 1000, 500), bodyMaterial = SaveMat(bm, $"{key}_body") };
+            Object.DestroyImmediate(whole);
             if (!finNode)
             {
+                if (membrane)
+                {
+                    model.fins = Save(membrane);
+                    model.finLods = Lods(model.fins, 600, 300);
+                    model.finMaterial = SaveMat(MembraneMaterial(shader, model.bodyMaterial.GetTexture("_BaseMap"), sp), $"{key}_fins");
+                    return model;
+                }
                 AssetDatabase.DeleteAsset($"{Dir}/{key}_fins.asset");
                 AssetDatabase.DeleteAsset($"{Dir}/{key}_fins.mat");
                 return model;
@@ -164,13 +186,34 @@ namespace Aquarium.EditorTools
             return model;
         }
 
+        /// <summary>Thin skin in the body's colours: blended over the body, only the sheet facing the eye (a closed sculpt has two).</summary>
+        static Material MembraneMaterial(Shader shader, Texture baseMap, FishSpecies sp)
+        {
+            var m = new Material(shader) { enableInstancing = true };
+            m.SetTexture("_BaseMap", baseMap);
+            m.SetFloat("_Membrane", 1);
+            m.EnableKeyword("_MEMBRANE");
+            m.SetFloat("_Roughness", 0.42f);
+            m.SetFloat("_Metallic", 0);
+            m.SetFloat("_CausticStrength", 0.35f);
+            m.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+            m.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+            m.SetFloat("_ZWrite", 0);
+            m.SetFloat("_Cull", (float)CullMode.Back);
+            m.renderQueue = 3000;
+            m.SetOverrideTag("RenderType", "Transparent");
+            if (sp.glow) m.SetColor("_EmissionColor", WebHex("#8fb6ff") * 0.6f);
+            return m;
+        }
+
         static Color WebHex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c; }
 
         /// <summary>
-        /// Simpler versions of a body (Unity's mesh LOD generator): about a quarter and a sixteenth
-        /// of the triangles, each saved as a mesh of its own (the instanced draw picks one).
+        /// Simpler versions of a mesh (Unity's mesh LOD generator): about a quarter and a sixteenth
+        /// of the triangles but not below the given numbers (a body without its fins may have few to
+        /// begin with), each saved as a mesh of its own (the instanced draw picks one).
         /// </summary>
-        static Mesh[] Lods(Mesh body)
+        static Mesh[] Lods(Mesh body, int minNear, int minFar)
         {
             var tmp = Object.Instantiate(body);
             MeshLodUtility.GenerateMeshLods(tmp);
@@ -180,11 +223,13 @@ namespace Aquarium.EditorTools
                 var all = tmp.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16
                     ? data[0].GetIndexData<ushort>().Select(i => (int)i).ToArray()
                     : data[0].GetIndexData<int>().ToArray();
-                foreach (int level in new[] { 2, 4 })
+                foreach (var (wanted, least) in new[] { (2, minNear), (4, minFar) })
                 {
-                    var r = tmp.GetLod(0, Mathf.Min(level, tmp.lodCount - 1));
+                    int level = Mathf.Min(wanted, tmp.lodCount - 1);
+                    while (level > 0 && tmp.GetLod(0, level).indexCount / 3 < least) level--;
+                    var r = tmp.GetLod(0, level);
                     var lod = Object.Instantiate(body);
-                    lod.name = $"{body.name}_lod{level}";
+                    lod.name = $"{body.name}_lod{wanted}";
                     lod.SetIndices(all.Skip((int)r.indexStart).Take((int)r.indexCount).ToArray(), MeshTopology.Triangles, 0, false);
                     result.Add(Save(lod));
                 }

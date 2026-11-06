@@ -90,6 +90,10 @@ namespace Aquarium.Fish
         // left and right pectoral extra angle, pelvic spread, pelvic beat phase
         public Vector4 finA = new Vector4(0, 1, 0.5f, 0), finB;
         float erect = 1, finAct = 0.5f, tailSpread, pelvic, finRipple, pelvicPhase;
+        // the face (shader _Face): mouth open, gill covers open
+        public Vector4 faceOpen;
+        float breath, effort, mouthOpen, gillOpen, chew, yawn;
+        float yawnIn = Rnd.R(30, 150);
         readonly float[] wobPhase = new float[9];
 
         public float p(string trait) => rec.Traits.TryGetValue(trait, out var v) ? (float)v : 0.5f;
@@ -1124,6 +1128,7 @@ namespace Aquarium.Fish
             finPhase += dt * (4 + pectS * 6);
             pect = 0.35f + hover * 0.25f + pectB * 0.6f + Mathf.Sin(finPhase) * (0.2f + pectS * 0.5f) + flare * 0.5f;
             AnimateFins(dt, rel, still, sleeping, rollJ, yawJ);
+            AnimateFace(dt, sleeping);
             // growing up: the body follows the age-dependent size smoothly
             if (Mathf.Abs(targetScale - scale) > 1e-4f)
             {
@@ -1172,6 +1177,62 @@ namespace Aquarium.Fish
             pelvicPhase += dt * (2.5f + 4 * finAct);
             finA = new Vector4(finRipple, erect, finAct, tailSpread);
             finB = new Vector4(l, r, pelvic, pelvicPhase);
+        }
+
+        /// <summary>
+        /// Breathing is a pump: the mouth opens and draws water in, shuts, and then the gill covers
+        /// lift to let it out. Small fish breathe faster, and a fish that has been working breathes
+        /// faster and deeper for a while. Over that: the mouth opens for food and snaps shut, the
+        /// fish chews and swallows, the gill covers spread when it shows off or threatens, and now
+        /// and then, when nothing is going on, it yawns.
+        /// </summary>
+        void AnimateFace(float dt, bool sleeping)
+        {
+            float work = Mathf.Clamp01(0.6f * tail * tail + (burst > 0 ? 0.6f : 0) + fear * 0.6f);
+            effort += (work - effort) * Mathf.Min(1, dt * (work > effort ? 1.5f : 0.15f));
+            float hertz = (0.75f + 0.25f / (0.25f + sp.len)) * (1 + 0.6f * effort) * (sleeping ? 0.6f : 1);
+            breath += dt * hertz * Mathf.PI * 2;
+            float depth = (sleeping ? 0.14f : 0.2f) + 0.3f * effort;
+            float mouth = Mathf.Pow(Mathf.Max(0, Mathf.Sin(breath)), 1.5f) * depth;
+            float gills = Mathf.Pow(Mathf.Max(0, Mathf.Sin(breath - 2.0f)), 1.5f) * (depth + 0.2f);
+
+            if (state == FishState.EAT && ctx.food != null && !ctx.food.eaten)
+            {
+                // wide open for the last stretch to the food
+                float reach = size * 0.45f + 0.07f;
+                float near = 1 - (Vector3.Distance(pos, ctx.food.pos) - reach) / (size * 0.9f);
+                mouth = Mathf.Max(mouth, Mathf.Clamp01(near));
+            }
+            if (gulp >= 1) chew = 0.9f;
+            if (chew > 0)
+            {
+                chew -= dt;
+                mouth = gulp > 0 ? 0 : Mathf.Max(mouth, 0.3f * Mathf.Abs(Mathf.Sin(chew * 13)));
+                gills = Mathf.Max(gills, 0.55f);
+            }
+            if (state == FishState.AIR) mouth = Mathf.Max(mouth, 0.55f);
+            if (flare > 0.02f || state == FishState.DEFEND || state == FishState.STANDOFF)
+            {
+                gills = Mathf.Max(gills, Mathf.Max(flare, 0.6f));
+                mouth = Mathf.Max(mouth, 0.3f);
+            }
+            yawnIn -= dt;
+            if (yawnIn <= 0)
+            {
+                yawnIn = Rnd.R(30, 150);
+                if (!sleeping && chew <= 0 && effort < 0.2f) yawn = 1;
+            }
+            if (yawn > 0)
+            {
+                yawn = Mathf.Max(0, yawn - dt / 1.6f);
+                float wide = Mathf.Sin((1 - yawn) * Mathf.PI);
+                mouth = Mathf.Max(mouth, wide);
+                gills = Mathf.Max(gills, wide * 0.8f);
+            }
+            // jaws are quicker to shut than to open
+            mouthOpen += (mouth - mouthOpen) * Mathf.Min(1, dt * (mouth > mouthOpen ? 12 : 22));
+            gillOpen += (gills - gillOpen) * Mathf.Min(1, dt * 10);
+            faceOpen = new Vector4(mouthOpen, gillOpen, 0, 0);
         }
 
         public void Update(float dt)

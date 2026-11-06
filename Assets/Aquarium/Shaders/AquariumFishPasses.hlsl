@@ -4,6 +4,10 @@
 // The solid fins of a sculpted model (marked by the web version's tools/fin_map.py) keep moving
 // on their own: the dorsal and anal fins carry a wave and fold down at speed, the tail fans and
 // its rim flutters, the pelvic pair beats and spreads to brake, every rim flickers a little.
+// _MEMBRANE draws those fins as skin between rays (the fin mesh of FinMembrane.cs), see MembraneSurface.
+// AQ_DEPTH is what goes into the depth texture: the bodies, and the solid part of the fins.
+// The face (FishFace.cs): the jaws turn around the corner of the mouth, the gill covers lift, a slit
+// opens behind them. Per fish _Face = (mouth open 0..1, gill covers open 0..1).
 // Per fish (instanced): _Wag = (phase, amplitude, turn bend, body length), _Pect, _Tint,
 // _FinA = (fin phase, dorsal/anal erect 0..1, fin activity 0..1, tail spread -1..1),
 // _FinB = (left and right pectoral extra angle, pelvic spread 0..1, pelvic beat phase).
@@ -24,6 +28,12 @@ CBUFFER_START(UnityPerMaterial)
     half _CausticStrength;
     half _Glow;
     half _Opacity;
+    half _FinClear;
+    half _FinDense;
+    half _FinBlur;
+    half _FinGlow;
+    float4 _Jaw;    // the corner of the mouth (z, y), how far the jaw turns, how much the gill slit shows
+    float4 _Gill;   // the gill cover as an ellipse: centre (z, y), radii (z, y)
 CBUFFER_END
 
 UNITY_INSTANCING_BUFFER_START(FishProps)
@@ -32,6 +42,7 @@ UNITY_INSTANCING_BUFFER_START(FishProps)
     UNITY_DEFINE_INSTANCED_PROP(float4, _Tint)
     UNITY_DEFINE_INSTANCED_PROP(float4, _FinA)
     UNITY_DEFINE_INSTANCED_PROP(float4, _FinB)
+    UNITY_DEFINE_INSTANCED_PROP(float4, _Face)
 UNITY_INSTANCING_BUFFER_END(FishProps)
 
 static const float FISH_K = 5.4;   // wave number * L: a bit over one body length per wave
@@ -89,7 +100,8 @@ struct FishAttributes
     float4 tangentOS : TANGENT;
     float2 uv : TEXCOORD0;
     float4 pect : TEXCOORD2;   // x: paddle direction (0 = not a pectoral), yzw: fin root
-    float4 fin : TEXCOORD3;    // x: fin type + 0.98 u (0 body, 1 tail, 2 dorsal, 3 anal, 4 pelvic, 5 pectoral)
+    float4 fin : TEXCOORD3;    // x: fin type + 0.98 u (0 body, 1 tail, 2 dorsal, 3 anal, 4 pelvic, 5 pectoral in the body, 6 pectoral of its own), y: ray number, z: skin
+    float3 face : TEXCOORD4;   // jaw weight, gill weight, 1 inside the mouth
     half4 color : COLOR;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
@@ -104,7 +116,12 @@ void FinMotion(float code, float L, float4 A, float4 B, inout float3 p)
     // every soft fin flickers at the rim: a small fast wave running out from the root
     float flick = sin(A.x * 2.3 - u * 4.0 + p.z * 11.0 / L + p.y * 7.0 / L) * pow(u, 1.4) * L * (0.012 + 0.03 * act);
     float side = p.x >= 0.0 ? 1.0 : -1.0;
-    if (type < 1.5)
+    if (type > 5.5)
+    {
+        // a pectoral of its own paddles around its root (FishDeform): here only the soft rim gives
+        p.x += flick * 0.6;
+    }
+    else if (type < 1.5)
     {
         // tail: the rays fan out and close up, the rim flutters
         // seen from the side: the fan keeps opening and closing a little, a wave runs along its rim
@@ -140,6 +157,28 @@ void FinMotion(float code, float L, float4 A, float4 B, inout float3 p)
     }
 }
 
+// the jaws and the gill covers, around the still head
+void FaceMotion(float3 face, float2 open, inout float3 p, inout float3 n)
+{
+    float a = face.x * open.x * _Jaw.z;
+    if (abs(a) > 1e-4)
+    {
+        float c = cos(a), s = sin(a);
+        float2 q = p.zy - _Jaw.xy;
+        p.zy = float2(c * q.x + s * q.y, -s * q.x + c * q.y) + _Jaw.xy;
+        n.zy = float2(c * n.z + s * n.y, -s * n.z + c * n.y);
+    }
+    float g = face.y * open.y;
+    if (g > 1e-4)
+    {
+        // hanging from its front edge: out and a little back, and it faces more forward
+        float lift = g * _Gill.z * 0.3;
+        p.x += (p.x >= 0.0 ? lift : -lift);
+        p.z -= lift * 0.35;
+        n = normalize(n + float3(0.0, 0.0, g * 0.5));
+    }
+}
+
 // the moving fish in object space
 void FishDeform(FishAttributes i, out float3 p, out float3 n)
 {
@@ -147,6 +186,9 @@ void FishDeform(FishAttributes i, out float3 p, out float3 n)
     float4 FA = UNITY_ACCESS_INSTANCED_PROP(FishProps, _FinA), FB = UNITY_ACCESS_INSTANCED_PROP(FishProps, _FinB);
     p = i.positionOS.xyz;
     n = i.normalOS;
+#if !defined(_FINS) && !defined(_MEMBRANE)
+    FaceMotion(i.face, UNITY_ACCESS_INSTANCED_PROP(FishProps, _Face).xy, p, n);
+#endif
     // pectorals paddle: in the fin mesh, or in the body of a sculpted model with solid fins
     if (i.pect.x != 0.0)
     {
@@ -171,6 +213,54 @@ void FishDeform(FishAttributes i, out float3 p, out float3 n)
     p = FishBend(W, p, n, finU, finTail);
 }
 
+#if defined(_MEMBRANE)
+// root -> rim 0..1, ray number, skin 0..1
+float3 FinCoords(float4 fin)
+{
+    float type = floor(fin.x + 1e-3);
+    return float3(saturate((fin.x - type) / 0.98), fin.y, fin.z);
+}
+
+// Skin between rays, by fin = (root -> rim, ray number, skin). The rays fork towards the rim and melt
+// into an average when smaller than a pixel. Pigment holds the opacity (pale skin is nearly clear), the
+// skin sags between the rays, a sheet seen edge-on is denser, and the rim thins out, frayed. Where
+// skin is 0 the fin meets the body and looks like it: opaque, no rays.
+void MembraneSurface(float3 fin, float3 viewWS, float3 positionWS, inout float3 normalWS, inout half3 albedo, inout half alpha, out float rayLine, out float skin)
+{
+    float u = fin.x, x = fin.y;
+    skin = smoothstep(0.0, 1.0, fin.z);
+    float pixel = fwidth(x);
+    float c = frac(x) - 0.5;
+    float fork = smoothstep(0.45, 0.85, u) * 0.23;
+    float halfWidth = lerp(0.13, 0.05, u);
+    float line01 = 1.0 - smoothstep(halfWidth - pixel, halfWidth + pixel, abs(abs(c) - fork));
+    float show = saturate(1.8 - pixel * 3.0);
+    rayLine = lerp(2.0 * halfWidth, line01, show) * skin;
+
+    float3 n = normalize(normalWS);
+    float3 dx = ddx(positionWS), dy = ddy(positionWS);
+    float3 across = cross(dy, n) * ddx(x) + cross(n, dx) * ddy(x);
+    float lenAcross = length(across);
+    if (lenAcross > 1e-8)
+    {
+        across *= sign(dot(n, cross(dx, dy))) / lenAcross;
+        n = normalize(n + across * sin(6.2832 * x) * 0.3 * show * skin);
+    }
+    // thin skin has no wrong side: on a folded lobe the normals pulled to the fin's plane may point away
+    if (dot(n, viewWS) < 0.0) n = lerp(n, -n, skin);
+    normalWS = n;
+
+    half peak = max(albedo.r, max(albedo.g, albedo.b));
+    half pigment = saturate((peak - min(albedo.r, min(albedo.g, albedo.b))) * 1.3 + (1.0 - peak) * 0.9);
+    float a = lerp(_FinClear, _FinDense, pigment);
+    a = lerp(a, saturate(a + 0.22), rayLine);
+    a = 1.0 - pow(saturate(1.0 - a), 1.0 / max(abs(dot(n, viewWS)), 0.3));
+    a *= 1.0 - 0.8 * smoothstep(0.84, 1.0, u + (1.0 - rayLine) * 0.07);
+    alpha = saturate(lerp(1.0, a, skin) * _Opacity);
+    albedo *= lerp(1.0, lerp(1.05, 0.78, rayLine), skin);
+}
+#endif
+
 // ------------------------------------------------------------------ forward
 #ifdef AQ_FORWARD
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -183,6 +273,12 @@ struct Varyings
     half4 tangentWS : TEXCOORD3;
     half4 color : TEXCOORD4;
     half fogFactor : TEXCOORD5;
+#if defined(_MEMBRANE)
+    float3 fin : TEXCOORD6;    // see FinCoords
+#elif !defined(_FINS)
+    float3 face : TEXCOORD6;   // jaw weight, gill weight, 1 inside the mouth
+    float2 rest : TEXCOORD7;   // (z, y) in the still model
+#endif
     DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 8);
 #ifdef USE_APV_PROBE_OCCLUSION
     float4 probeOcclusion : TEXCOORD10;
@@ -206,14 +302,59 @@ Varyings FishVertex(FishAttributes i)
     o.uv = TRANSFORM_TEX(i.uv, _BaseMap);
     o.color = i.color * half4(UNITY_ACCESS_INSTANCED_PROP(FishProps, _Tint).rgb, 1);
     o.fogFactor = ComputeFogFactor(o.positionCS.z);
+#if defined(_MEMBRANE)
+    o.fin = FinCoords(i.fin);
+#elif !defined(_FINS)
+    o.face = i.face;
+    o.rest = i.positionOS.zy;
+#endif
     OUTPUT_SH4(o.positionWS, o.normalWS, GetWorldSpaceNormalizeViewDir(o.positionWS), o.vertexSH, o.probeOcclusion);
     return o;
 }
 
+#if !defined(_FINS) && !defined(_MEMBRANE)
+// The inside of the mouth: dark flesh by the lips, darker deep in. The slit behind a lifted gill
+// cover: only along its rear edge, widest in the middle, as wide as the cover is open. By the cover
+// it is the skin in the cover's shadow, further out and with the cover well open the red of the gills.
+void FaceSurface(float3 face, float2 rest, float gillOpen, inout SurfaceData s, inout float caustics)
+{
+    if (face.z > 0.5)
+    {
+        float across = saturate(face.x * 0.8 + 0.2);
+        s.albedo = lerp(half3(0.07, 0.008, 0.01), half3(0.004, 0.0005, 0.001), saturate(5.0 * across * (1.0 - across)));
+        s.smoothness = 0.05;
+        s.metallic = 0;
+        s.emission = 0;
+        caustics = 0;
+        return;
+    }
+    if (gillOpen <= 0.001 || face.y <= 0.001) return;
+    float2 q = (rest - _Gill.xy) / _Gill.zw;
+    float r = length(q);
+    float rear = smoothstep(0.3, 0.85, -q.x);
+    if (rear <= 0.0) return;
+    float wide = (0.02 + 0.12 * gillOpen) * rear;
+    float out01 = (r - 1.0) / wide;
+    float slit = smoothstep(-0.6, 0.0, out01) * (1.0 - smoothstep(0.35, 1.0, out01))
+        * saturate(face.y * 10.0) * saturate(gillOpen * 6.0) * _Jaw.w;
+    if (slit <= 0.0) return;
+    half3 inside = lerp(s.albedo * 0.16, half3(0.2, 0.02, 0.03), saturate(out01 * 1.5) * saturate(gillOpen * 1.6 - 0.2));
+    s.albedo = lerp(s.albedo, inside, slit);
+    s.smoothness *= 1.0 - slit;
+    s.emission *= 1.0 - slit;
+    caustics *= 1.0 - slit;
+}
+#endif
+
 half4 FishFragment(Varyings i, FRONT_FACE_TYPE facing : FRONT_FACE_SEMANTIC) : SV_Target
 {
     UNITY_SETUP_INSTANCE_ID(i);
+#if defined(_MEMBRANE)
+    // the sculpt's colours without its fine relief (it reads as scales on a fin), sharp at the root to meet the body
+    half4 albedoAlpha = SAMPLE_TEXTURE2D_BIAS(_BaseMap, sampler_BaseMap, i.uv, _FinBlur * i.fin.z) * _BaseColor * i.color;
+#else
     half4 albedoAlpha = SampleAlbedoAlpha(i.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap)) * _BaseColor * i.color;
+#endif
     SurfaceData s = (SurfaceData)0;
     s.albedo = albedoAlpha.rgb;
     s.alpha = saturate(albedoAlpha.a * _Opacity);
@@ -222,11 +363,19 @@ half4 FishFragment(Varyings i, FRONT_FACE_TYPE facing : FRONT_FACE_SEMANTIC) : S
     s.occlusion = 1;
     s.emission = _EmissionColor.rgb;
     s.normalTS = SampleNormal(i.uv, TEXTURE2D_ARGS(_BumpMap, sampler_BumpMap), _BumpScale);
+    float caustics = _CausticStrength;
+#if !defined(_FINS) && !defined(_MEMBRANE)
+    FaceSurface(i.face, i.rest, UNITY_ACCESS_INSTANCED_PROP(FishProps, _Face).y, s, caustics);
+#endif
 
     float3 normalWS = i.normalWS * IS_FRONT_VFACE(facing, 1.0, -1.0);
     InputData d = (InputData)0;
     d.positionWS = i.positionWS;
     d.viewDirectionWS = GetWorldSpaceNormalizeViewDir(i.positionWS);
+#if defined(_MEMBRANE)
+    float rayLine, skin;
+    MembraneSurface(i.fin, d.viewDirectionWS, i.positionWS, normalWS, s.albedo, s.alpha, rayLine, skin);
+#endif
 #if defined(_NORMALMAP)
     float3 bitangent = i.tangentWS.w * cross(normalWS, i.tangentWS.xyz);
     d.normalWS = TransformTangentToWorld(s.normalTS, half3x3(i.tangentWS.xyz, bitangent, normalWS));
@@ -246,14 +395,20 @@ half4 FishFragment(Varyings i, FRONT_FACE_TYPE facing : FRONT_FACE_SEMANTIC) : S
     d.shadowMask = SAMPLE_SHADOWMASK(i.staticLightmapUV);
 #endif
     half4 color = UniversalFragmentPBR(d, s);
-    color.rgb += AqCaustics(i.positionWS, d.normalWS, s.albedo, _CausticStrength);
+    color.rgb += AqCaustics(i.positionWS, d.normalWS, s.albedo, caustics);
+#if defined(_MEMBRANE)
+    // thin skin: the light on its far side comes through, tinted by the skin (less through a ray)
+    Light sun = GetMainLight(d.shadowCoord, d.positionWS, d.shadowMask);
+    float through = saturate(0.35 - dot(d.normalWS, sun.direction) * 0.65) + 0.8 * pow(saturate(dot(d.viewDirectionWS, -sun.direction)), 4.0);
+    color.rgb += s.albedo * sun.color * sun.shadowAttenuation * through * _FinGlow * (1.0 - 0.6 * rayLine) * skin;
+#endif
     if (_Glow > 0)
     {
         float fr = pow(1.0 - abs(dot(d.normalWS, d.viewDirectionWS)), 2.0);
         color.rgb += s.albedo * _Glow * (0.6 + fr * 2.0);
     }
     color.rgb = MixFog(color.rgb, d.fogCoord);
-#if defined(_FINS)
+#if defined(_FINS) || defined(_MEMBRANE)
     color.a = s.alpha;
 #else
     color.a = 1;
@@ -280,6 +435,62 @@ ShadowVaryings FishShadowVertex(FishAttributes i)
     return o;
 }
 half4 FishShadowFragment(ShadowVaryings i) : SV_Target { return 0; }
+#endif
+
+// ------------------------------------------------------------------ depth
+#ifdef AQ_DEPTH
+// the fin as a whole counts, all but its thinning rim: below this it goes with what is behind it
+static const float FIN_SOLID = 0.1;
+
+struct DepthVaryings
+{
+    float2 uv : TEXCOORD0;
+    float3 positionWS : TEXCOORD1;
+    float3 normalWS : TEXCOORD2;
+    half4 color : TEXCOORD3;
+    float3 fin : TEXCOORD4;
+    float4 positionCS : SV_POSITION;
+    UNITY_VERTEX_INPUT_INSTANCE_ID
+};
+
+DepthVaryings FishDepthVertex(FishAttributes i)
+{
+    DepthVaryings o = (DepthVaryings)0;
+    UNITY_SETUP_INSTANCE_ID(i);
+    UNITY_TRANSFER_INSTANCE_ID(i, o);
+    float3 p, n;
+    FishDeform(i, p, n);
+    o.positionWS = TransformObjectToWorld(p);
+    o.positionCS = TransformWorldToHClip(o.positionWS);
+    o.normalWS = TransformObjectToWorldNormal(n);
+    o.uv = TRANSFORM_TEX(i.uv, _BaseMap);
+    o.color = i.color * half4(UNITY_ACCESS_INSTANCED_PROP(FishProps, _Tint).rgb, 1);
+#if defined(_MEMBRANE)
+    o.fin = FinCoords(i.fin);
+#endif
+    return o;
+}
+
+half4 FishDepthFragment(DepthVaryings i) : SV_Target
+{
+    UNITY_SETUP_INSTANCE_ID(i);
+#if defined(_FINS) || defined(_MEMBRANE)
+    half4 tex = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv) * _BaseColor * i.color;
+    half alpha = saturate(tex.a * _Opacity);
+    #if defined(_MEMBRANE)
+    float rayLine, skin;
+    float3 surfaceNormal = i.normalWS;
+    half3 albedo = tex.rgb;
+    MembraneSurface(i.fin, GetWorldSpaceNormalizeViewDir(i.positionWS), i.positionWS, surfaceNormal, albedo, alpha, rayLine, skin);
+    #endif
+    clip(alpha - FIN_SOLID);
+#endif
+#if defined(AQ_DEPTH_NORMALS)
+    return half4(NormalizeNormalPerPixel(i.normalWS), 0.0);
+#else
+    return i.positionCS.z;
+#endif
+}
 #endif
 
 #endif

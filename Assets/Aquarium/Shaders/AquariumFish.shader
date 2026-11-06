@@ -1,6 +1,7 @@
-// Fish bodies and fins, drawn instanced (see AquariumFishPasses.hlsl). Fins use the _FINS
-// keyword: the fin atlas ripples, and they are transparent and two-sided. Pectorals (uv2) paddle
-// in either mesh.
+// Fish bodies and fins, drawn instanced (see AquariumFishPasses.hlsl). The _FINS keyword is a fin
+// atlas that ripples, transparent and two-sided (the moonfish); _MEMBRANE is the fins cut out of a
+// sculpted model (FinMembrane.cs): thin, see-through skin between rays. Pectorals (uv2) paddle in
+// any mesh.
 Shader "Aquarium/Fish"
 {
     Properties
@@ -16,6 +17,13 @@ Shader "Aquarium/Fish"
         _Glow("Rim glow (night creatures)", Float) = 0
         _Opacity("Opacity", Range(0, 1)) = 1
         [Toggle(_FINS)] _Fins("Fins", Float) = 0
+        [Toggle(_MEMBRANE)] _Membrane("Membrane", Float) = 0
+        _FinClear("Membrane opacity, no pigment", Range(0, 1)) = 0.22
+        _FinDense("Membrane opacity, full pigment", Range(0, 1)) = 0.78
+        _FinBlur("Membrane texture blur (mip levels)", Range(0, 5)) = 2.5
+        _FinGlow("Membrane light through", Range(0, 2)) = 0.7
+        _Jaw("Corner of the mouth (z, y), jaw turn, gill slit", Vector) = (0, 0, 0, 0)
+        _Gill("Gill cover: centre (z, y), radii (z, y)", Vector) = (0, 0, 1, 1)
         [Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend("Src Blend", Float) = 1
         [Enum(UnityEngine.Rendering.BlendMode)] _DstBlend("Dst Blend", Float) = 0
         [Toggle] _ZWrite("ZWrite", Float) = 1
@@ -36,6 +44,7 @@ Shader "Aquarium/Fish"
             #pragma vertex FishVertex
             #pragma fragment FishFragment
             #pragma shader_feature_local _FINS
+            #pragma shader_feature_local _MEMBRANE
             #pragma shader_feature_local _NORMALMAP
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
@@ -63,6 +72,40 @@ Shader "Aquarium/Fish"
             #pragma shader_feature_local _FINS
             #pragma multi_compile_instancing
             #define AQ_SHADOW
+            #include "AquariumFishPasses.hlsl"
+            ENDHLSL
+        }
+        // the depth pre-pass, where there is one (ambient occlusion on Ultra, a browser with MSAA):
+        // without these the fish are missing from the depth depth of field reads
+        Pass
+        {
+            Name "DepthOnly"
+            Tags { "LightMode" = "DepthOnly" }
+            ZWrite On
+            ColorMask R
+            Cull [_Cull]
+            HLSLPROGRAM
+            #pragma target 3.5
+            #pragma vertex FishDepthVertex
+            #pragma fragment FishDepthFragment
+            #pragma multi_compile_instancing
+            #define AQ_DEPTH
+            #include "AquariumFishPasses.hlsl"
+            ENDHLSL
+        }
+        Pass
+        {
+            Name "DepthNormals"
+            Tags { "LightMode" = "DepthNormals" }
+            ZWrite On
+            Cull [_Cull]
+            HLSLPROGRAM
+            #pragma target 3.5
+            #pragma vertex FishDepthVertex
+            #pragma fragment FishDepthFragment
+            #pragma multi_compile_instancing
+            #define AQ_DEPTH
+            #define AQ_DEPTH_NORMALS
             #include "AquariumFishPasses.hlsl"
             ENDHLSL
         }

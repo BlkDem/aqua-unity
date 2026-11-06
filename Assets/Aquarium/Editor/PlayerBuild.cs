@@ -16,7 +16,6 @@ namespace Aquarium.EditorTools
             PlayerSettings.companyName = "umolab";
             PlayerSettings.enableFrameTimingStats = true;   // CPU and GPU frame times for the FPS line and the benchmark
             PlayerSettings.fullScreenMode = FullScreenMode.FullScreenWindow;
-            PlayerSettings.runInBackground = true;
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, ScriptingImplementation.Mono2x);
         }
 

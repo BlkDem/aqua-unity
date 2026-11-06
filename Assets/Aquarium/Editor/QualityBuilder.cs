@@ -44,6 +44,10 @@ namespace Aquarium.EditorTools
             var plain = AssetDatabase.LoadAssetAtPath<ScriptableRendererData>(plainPath);
             foreach (var f in plain.rendererFeatures)
                 if (f && f.GetType().Name.Contains("AmbientOcclusion")) f.SetActive(false);
+            // depth of field reads the depth after the see-through things: the fins write theirs last of all
+            var plainSo = new SerializedObject(plain);
+            plainSo.FindProperty("m_CopyDepthMode").intValue = (int)CopyDepthMode.AfterTransparents;
+            plainSo.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(plain);
             var assets = new UniversalRenderPipelineAsset[Presets.Length];
             for (int i = 0; i < Presets.Length; i++)

@@ -314,6 +314,7 @@ namespace Aquarium.App
             if (!volume || !volume.sharedProfile || !volume.sharedProfile.TryGet(out DepthOfField dof)) return;
             bool want = dofOn && mode != CameraMode.Free;
             dof.active = want;
+            Aquarium.Fish.FishRenderer.FinDepth = want;
             focus += (focusDist - focus) * Mathf.Min(1, dt * 4);
             dof.focusDistance.value = focus;
             bool close = shot != null && shot.track && mode != CameraMode.Follow;

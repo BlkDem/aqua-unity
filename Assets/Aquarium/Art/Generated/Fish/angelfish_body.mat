@@ -39,8 +39,13 @@ Material:
     - _CausticStrength: 0.55
     - _Cull: 2
     - _DstBlend: 0
+    - _FinBlur: 2.5
+    - _FinClear: 0.22
+    - _FinDense: 0.78
+    - _FinGlow: 0.7
     - _Fins: 0
     - _Glow: 0
+    - _Membrane: 0
     - _Metallic: 0.05
     - _Opacity: 1
     - _Roughness: 0.3
@@ -49,5 +54,7 @@ Material:
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _Gill: {r: 0.1835, g: 0.0372, b: 0.08, a: 0.067}
+    - _Jaw: {r: 0.2819, g: 0.0818, b: 0.45, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

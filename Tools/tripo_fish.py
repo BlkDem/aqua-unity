@@ -2,8 +2,8 @@
 Sculpted fish from Tripo (one mesh, ~2M triangles, 4K textures) -> the game's fish GLBs in
 Assets/Aquarium/Models/Fish, laid out like the web version's make_fish.py: glTF +Z nose, +Y up,
 body length FishSpecies len; Body = everything but the pectorals (its own eyes, solid fins),
-PectL/PectR with the origin at the fin root. No Fins node, so FishModelBuilder puts the
-pectorals into the body and draws no fin mesh.
+PectL/PectR with the origin at the fin root. No Fins node, so FishModelBuilder cuts the fins
+out of the sculpt itself (FinMembrane.cs).
 
   blender -b -P Tools/tripo_fish.py -- <preset> <tripo.glb> <out dir> <texture dir>
 

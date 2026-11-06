@@ -214,6 +214,15 @@ namespace Aquarium.EditorTools
                 go.GetComponent<MeshFilter>().sharedMesh = m.body;
                 var mr = go.GetComponent<MeshRenderer>();
                 mr.sharedMaterial = m.bodyMaterial;
+                MeshRenderer finRenderer = null;
+                if (m.fins)
+                {
+                    var finGo = new GameObject("sweep fins", typeof(MeshFilter), typeof(MeshRenderer));
+                    finGo.transform.SetParent(go.transform, false);
+                    finGo.GetComponent<MeshFilter>().sharedMesh = m.fins;
+                    finRenderer = finGo.GetComponent<MeshRenderer>();
+                    finRenderer.sharedMaterial = m.finMaterial;
+                }
                 for (int k = 0; k < 8; k++)
                 {
                     float t = k * 0.1f;
@@ -224,6 +233,7 @@ namespace Aquarium.EditorTools
                     props.SetVector("_FinA", new Vector4(t * 10, 1, 1, 0.5f + 0.5f * Mathf.Sin(t * 3)));
                     props.SetVector("_FinB", new Vector4(0.35f * Mathf.Sin(t * 4.5f), -0.35f * Mathf.Sin(t * 4.5f), 0.6f, t * 6.5f));
                     mr.SetPropertyBlock(props);
+                    if (finRenderer) finRenderer.SetPropertyBlock(props);
                     foreach (var (view, offset) in new[] { ("side", new Vector3(-len * 2.6f, 0, 0)), ("top", new Vector3(0, len * 2.6f, 0.001f)) })
                     {
                         cam.transform.position = at + offset;
@@ -236,7 +246,7 @@ namespace Aquarium.EditorTools
             Debug.Log("Sweep rendered");
         }
 
-        /// <summary>One fish model at rest (no wave, fins still) and paddling, from the side and from above.</summary>
+        /// <summary>One fish model at rest (no wave, fins still) and paddling, from the side and from above, instanced as in the game; AQ_OPEN opens its mouth and gill covers.</summary>
         public static void FishRest()
         {
             EditorSettings.asyncShaderCompilation = false;
@@ -259,6 +269,7 @@ namespace Aquarium.EditorTools
                     props.SetVectorArray("_Tint", new[] { Vector4.one });
                     props.SetVectorArray("_FinA", new[] { new Vector4(0, 1, 0, 0) });   // fins up, still
                     props.SetVectorArray("_FinB", new[] { Vector4.zero });
+                    props.SetVectorArray("_Face", new[] { System.Environment.GetEnvironmentVariable("AQ_OPEN") != null ? new Vector4(1, 1, 0, 0) : Vector4.zero });
                     var mat = new[] { Matrix4x4.TRS(at, Quaternion.identity, Vector3.one) };
                     Graphics.RenderMeshInstanced(new RenderParams(m.bodyMaterial) { matProps = props }, m.body, 0, mat, 1);
                     if (m.fins) Graphics.RenderMeshInstanced(new RenderParams(m.finMaterial) { matProps = props }, m.fins, 0, mat, 1);
@@ -268,6 +279,161 @@ namespace Aquarium.EditorTools
                 }
             }
             Debug.Log("Rest rendered");
+        }
+
+        /// <summary>
+        /// Every fish model close up in the tank's daylight, its fins moving: from the side, from the
+        /// front quarter and against the light, into Logs/fins (AQ_OUT). AQ_FISH picks the models,
+        /// AQ_NOFINS leaves out the fin mesh, AQ_LOD=0|1 takes the simpler meshes, AQ_DOF adds the
+        /// cinematic mode's depth of field and a shot of the tail's root, AQ_QUALITY picks the preset.
+        /// </summary>
+        public static void BuildFinLook()
+        {
+            FishModelBuilder.Build();
+            FinLook();
+        }
+
+        public static void FinLook()
+        {
+            EditorSettings.asyncShaderCompilation = false;
+            EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
+            var cam = Camera.main;
+            cam.GetComponent<OrbitCamera>().enabled = false;
+            cam.fieldOfView = 30;
+            Object.FindAnyObjectByType<AquariumClock>().Apply(12);
+            var day = Object.FindAnyObjectByType<DayCycle>();
+            day.mode = DayCycle.Mode.Day; day.Snap();
+            var set = AssetDatabase.LoadAssetAtPath<Aquarium.Fish.FishModelSet>(FishModelBuilder.SetPath);
+            string dir = System.Environment.GetEnvironmentVariable("AQ_OUT") ?? "Logs/fins";
+            Directory.CreateDirectory(dir);
+            var at = new Vector3(0, 3.2f, 1.5f);
+            int wasQuality = QualitySettings.GetQualityLevel();
+            if (int.TryParse(System.Environment.GetEnvironmentVariable("AQ_QUALITY"), out var quality)) QualitySettings.SetQualityLevel(quality, true);
+            bool blur = System.Environment.GetEnvironmentVariable("AQ_DOF") != null;
+            UnityEngine.Rendering.Universal.DepthOfField dof = null;
+            if (blur) Object.FindAnyObjectByType<Volume>().sharedProfile.TryGet(out dof);
+            if (dof) { dof.active = true; dof.aperture.value = 3.2f; }
+            int w = blur ? 1280 : 640, h = blur ? 960 : 480;
+            foreach (var key in Only(set.models.Select(x => x.key).ToArray()))
+            {
+                var m = set.Get(key);
+                if (m == null) continue;
+                float len = Aquarium.Fish.FishSpecies.All[key.Split('-')[0]].len;
+                var root = new GameObject("fin look");
+                root.transform.position = at;
+                root.transform.rotation = Quaternion.Euler(0, 90, 0);   // nose along +x, the side towards the front glass
+                var parts = new List<MeshRenderer>();
+                void Part(Mesh mesh, Material mat)
+                {
+                    if (!mesh) return;
+                    var go = new GameObject("part");
+                    go.transform.SetParent(root.transform, false);
+                    go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                    var r = go.AddComponent<MeshRenderer>();
+                    r.sharedMaterial = mat;
+                    parts.Add(r);
+                }
+                int lod = int.TryParse(System.Environment.GetEnvironmentVariable("AQ_LOD"), out var level) ? level : -1;
+                Part(lod >= 0 ? m.bodyLods[lod] : m.body, m.bodyMaterial);
+                var finMesh = lod >= 0 && m.finLods.Length > lod ? m.finLods[lod] : m.fins;
+                if (System.Environment.GetEnvironmentVariable("AQ_NOFINS") == null) Part(finMesh, m.finMaterial);
+                if (blur && finMesh && set.finDepth)
+                {
+                    m.FinDepthMaterials(set.finDepth, out var last, out var early);
+                    Part(finMesh, last);
+                    Part(finMesh, early);
+                }
+                var props = new MaterialPropertyBlock();
+                props.SetVector("_Wag", new Vector4(1.1f, 0.02f * len, 0, len));
+                props.SetFloat("_Pect", 0.45f);
+                props.SetVector("_Tint", Vector4.one);
+                props.SetVector("_FinA", new Vector4(1.3f, 1, 0.4f, 0.3f));
+                props.SetVector("_FinB", new Vector4(0.15f, -0.1f, 0.2f, 1.0f));
+                foreach (var r in parts) r.SetPropertyBlock(props);
+                var views = new List<(string name, Vector3 offset, Vector3 look)>
+                {
+                    ("side", new Vector3(0, 0.05f, 2.6f), Vector3.zero),
+                    ("quarter", new Vector3(1.5f, 0.35f, 2.0f), Vector3.zero),
+                    ("up", new Vector3(0.4f, -1.3f, 2.2f), Vector3.zero),   // from below, against the light from the lid
+                };
+                if (blur) views.Add(("tail", new Vector3(-0.45f, 0.05f, 1.0f), new Vector3(-0.45f, 0, 0)));
+                foreach (var (view, offset, look) in views)
+                {
+                    cam.transform.position = at + offset * len;
+                    cam.transform.LookAt(at + look * len);
+                    if (dof) dof.focusDistance.value = (offset - look).magnitude * len;
+                    Save(cam, $"{dir}/{key}-{view}.png", w, h);
+                }
+                Object.DestroyImmediate(root);
+            }
+            if (dof) dof.active = false;
+            QualitySettings.SetQualityLevel(wasQuality, true);
+            Debug.Log("Fin look rendered");
+        }
+
+        /// <summary>
+        /// Every fish model's head from the side, without perspective (so that a picture measures the
+        /// model: 1000 pixels of height are 2 * AQ_HEAD_SIZE units around z = AQ_HEAD_Z share of the length,
+        /// y = 0), into Logs/face (AQ_OUT). AQ_FISH picks the models.
+        /// </summary>
+        public static void HeadLook()
+        {
+            EditorSettings.asyncShaderCompilation = false;
+            EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
+            var cam = Camera.main;
+            cam.GetComponent<OrbitCamera>().enabled = false;
+            cam.orthographic = true;
+            Object.FindAnyObjectByType<AquariumClock>().Apply(12);
+            var day = Object.FindAnyObjectByType<DayCycle>();
+            day.mode = DayCycle.Mode.Day; day.Snap();
+            var set = AssetDatabase.LoadAssetAtPath<Aquarium.Fish.FishModelSet>(FishModelBuilder.SetPath);
+            string dir = System.Environment.GetEnvironmentVariable("AQ_OUT") ?? "Logs/face";
+            Directory.CreateDirectory(dir);
+            var at = new Vector3(0, 3.2f, 1.5f);
+            var report = new System.Text.StringBuilder();
+            foreach (var key in Only(set.models.Select(x => x.key).ToArray()))
+            {
+                var m = set.Get(key);
+                if (m == null) continue;
+                float len = Aquarium.Fish.FishSpecies.All[key.Split('-')[0]].len;
+                var root = new GameObject("head look");
+                root.transform.position = at;
+                root.transform.rotation = Quaternion.Euler(0, 90, 0);
+                var parts = new List<MeshRenderer>();
+                foreach (var (mesh, mat) in new[] { (m.body, m.bodyMaterial), (m.fins, m.finMaterial) })
+                {
+                    if (!mesh) continue;
+                    var go = new GameObject("part");
+                    go.transform.SetParent(root.transform, false);
+                    go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                    var r = go.AddComponent<MeshRenderer>();
+                    r.sharedMaterial = mat;
+                    parts.Add(r);
+                }
+                var props = new MaterialPropertyBlock();
+                props.SetVector("_Wag", new Vector4(0, 0, 0, len));
+                props.SetFloat("_Pect", 0);
+                props.SetVector("_Tint", Vector4.one);
+                props.SetVector("_FinA", new Vector4(0, 1, 0, 0));
+                props.SetVector("_FinB", Vector4.zero);
+                foreach (var r in parts) r.SetPropertyBlock(props);
+                float centre = 0.32f * len, half = 0.3f * len;   // model z, half the height of the picture
+                cam.orthographicSize = half;
+                foreach (var (tag, open, turn) in new[] { ("", 0f, 0f), ("-half", 0.35f, 0f), ("-open", 1f, 0f), ("-open-q", 1f, 40f), ("-half-q", 0.35f, 40f) })
+                {
+                    props.SetVector("_Face", new Vector4(open, open, 0, 0));
+                    foreach (var r in parts) r.SetPropertyBlock(props);
+                    root.transform.rotation = Quaternion.Euler(0, 90 + turn, 0);
+                    var head = root.transform.TransformPoint(new Vector3(0, 0, centre));
+                    cam.transform.position = head + new Vector3(0, 0, 2);
+                    cam.transform.rotation = Quaternion.LookRotation(Vector3.back);
+                    Save(cam, $"{dir}/{key}{tag}.png", 1000, 1000);
+                }
+                report.AppendLine($"{key} len={len} centre_z={centre} half={half} bounds z {m.body.bounds.min.z:0.###}..{m.body.bounds.max.z:0.###} y {m.body.bounds.min.y:0.###}..{m.body.bounds.max.y:0.###} x {m.body.bounds.min.x:0.###}..{m.body.bounds.max.x:0.###}");
+                Object.DestroyImmediate(root);
+            }
+            File.WriteAllText($"{dir}/heads.txt", report.ToString());
+            Debug.Log("Head look rendered");
         }
 
         /// <summary>
@@ -308,6 +474,9 @@ namespace Aquarium.EditorTools
                 props.SetFloat("_Pect", f.pect);
                 var t = f.rec.Gene.Tint;
                 props.SetVector("_Tint", new Vector4((float)t[0], (float)t[1], (float)t[2], 1));
+                props.SetVector("_FinA", f.finA);
+                props.SetVector("_FinB", f.finB);
+                props.SetVector("_Face", f.faceOpen);
                 var pos = new Vector3(-f.pos.x, f.pos.y, f.pos.z);
                 var rot = Aquarium.Fish.FishRenderer.ToUnity(f.rotation);
                 Add(m.body, m.bodyMaterial, pos, rot, f.scaleXYZ, props);
@@ -362,6 +531,95 @@ namespace Aquarium.EditorTools
                 }
             }
             Debug.Log("Critter strip rendered");
+        }
+
+        /// <summary>
+        /// A fresh aquarium: how each kind of fish breathes (numbers in the log) and frames of its head
+        /// following it, then frames of a fish going for food, into Logs/face-strip (AQ_OUT).
+        /// </summary>
+        public static void FaceStrip()
+        {
+            EditorSettings.asyncShaderCompilation = false;
+            EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
+            var cam = Camera.main;
+            cam.GetComponent<OrbitCamera>().enabled = false;
+            cam.fieldOfView = 30;
+            var app = Object.FindAnyObjectByType<Aquarium.Fish.AquariumApp>();
+            app.Boot(new Aquarium.Life.MemoryWorldStore());
+            UnityEngine.Random.InitState(5);
+            for (int i = 0; i < 300; i++) app.Simulate(1 / 30f);
+            string dir = System.Environment.GetEnvironmentVariable("AQ_OUT") ?? "Logs/face-strip";
+            Directory.CreateDirectory(dir);
+
+            // breaths per second, how far the mouth and the gill covers go
+            var byKind = app.Eco.fish.GroupBy(f => f.sp.id).ToDictionary(g => g.Key, g => g.First());
+            var maxM = byKind.Keys.ToDictionary(k => k, k => 0f);
+            var maxG = byKind.Keys.ToDictionary(k => k, k => 0f);
+            var beats = byKind.Keys.ToDictionary(k => k, k => 0);
+            var was = byKind.Keys.ToDictionary(k => k, k => false);
+            for (int i = 0; i < 600; i++)
+            {
+                app.Simulate(1 / 30f);
+                foreach (var (k, f) in byKind)
+                {
+                    maxM[k] = Mathf.Max(maxM[k], f.faceOpen.x);
+                    maxG[k] = Mathf.Max(maxG[k], f.faceOpen.y);
+                    bool open = f.faceOpen.x > 0.05f;
+                    if (open && !was[k]) beats[k]++;
+                    was[k] = open;
+                }
+            }
+            foreach (var k in byKind.Keys) Debug.Log($"BREATH {k}: {beats[k] / 20f:0.00} per second, mouth up to {maxM[k]:0.00}, gill covers up to {maxG[k]:0.00}");
+
+            void Follow(Aquarium.Fish.Fish f, string name, int frames, int steps)
+            {
+                for (int k = 0; k < frames; k++)
+                {
+                    for (int s = 0; s < steps; s++) app.Simulate(1 / 30f);
+                    var rot = Aquarium.Fish.FishRenderer.ToUnity(f.rotation);
+                    var pos = new Vector3(-f.pos.x, f.pos.y, f.pos.z);
+                    var head = pos + rot * new Vector3(0, 0, 0.3f * f.sp.len * f.scaleXYZ.z);
+                    cam.transform.position = head + rot * new Vector3(0.9f * f.sp.len, 0.1f * f.sp.len, 0.25f * f.sp.len);
+                    cam.transform.LookAt(head, Vector3.up);
+                    Debug.Log($"FRAME {name}-{k}: mouth {f.faceOpen.x:0.00} gills {f.faceOpen.y:0.00} state {f.state}");
+                    // this fish alone, as an ordinary renderer: the instanced draws would pile up
+                    var model = app.fishModels.Get(f.modelKey);
+                    var props = new MaterialPropertyBlock();
+                    props.SetVector("_Wag", new Vector4(f.wag.x, -f.wag.y, -f.wag.z, f.wag.w));
+                    props.SetFloat("_Pect", f.pect);
+                    props.SetVector("_Tint", Vector4.one);
+                    props.SetVector("_FinA", f.finA);
+                    props.SetVector("_FinB", f.finB);
+                    props.SetVector("_Face", f.faceOpen);
+                    var root = new GameObject("followed");
+                    root.transform.SetPositionAndRotation(pos, rot);
+                    root.transform.localScale = f.scaleXYZ;
+                    foreach (var (mesh, mat) in new[] { (model.body, model.bodyMaterial), (model.fins, model.finMaterial) })
+                    {
+                        if (!mesh) continue;
+                        var go = new GameObject("part");
+                        go.transform.SetParent(root.transform, false);
+                        go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                        var r = go.AddComponent<MeshRenderer>();
+                        r.sharedMaterial = mat;
+                        r.SetPropertyBlock(props);
+                    }
+                    Save(cam, $"{dir}/{name}-{k}.png", 400, 300);
+                    Object.DestroyImmediate(root);
+                }
+            }
+            foreach (var key in new[] { "neon", "barb", "goldfish", "cichlid" })
+                if (byKind.TryGetValue(key, out var f)) Follow(f, key, 8, 2);
+
+            app.Eco.Feed(0);
+            Aquarium.Fish.Fish eater = null;
+            for (int i = 0; i < 30 * 40 && eater == null; i++)
+            {
+                app.Simulate(1 / 30f);
+                eater = app.Eco.fish.FirstOrDefault(f => f.sp.len > 0.4f && f.state == Aquarium.Fish.FishState.EAT && f.faceOpen.x > 0.5f);
+            }
+            if (eater != null) Follow(eater, "eat", 12, 1);
+            Debug.Log("Face strip rendered");
         }
 
         /// <summary>Feed a fresh aquarium and report how the fish react (numbers, no pictures).</summary>
