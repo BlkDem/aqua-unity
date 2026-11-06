@@ -622,6 +622,74 @@ namespace Aquarium.EditorTools
             Debug.Log("Face strip rendered");
         }
 
+        /// <summary>
+        /// How much the fish overlap in a fresh aquarium, with a feeding halfway, without and with the
+        /// bodies keeping apart (numbers, no pictures).
+        /// </summary>
+        public static void OverlapCheck()
+        {
+            const float Dt = 1 / 30f;
+            foreach (bool on in new[] { false, true })
+            {
+                Aquarium.Fish.FishBodies.On = on;
+                Aquarium.Fish.FishBodies.Pushed = 0;
+                EditorSceneManager.OpenScene(SceneBuilder.ScenePath, OpenSceneMode.Single);
+                var app = Object.FindAnyObjectByType<Aquarium.Fish.AquariumApp>();
+                app.Boot(new Aquarium.Life.MemoryWorldStore());
+                UnityEngine.Random.InitState(5);
+                for (int i = 0; i < 300; i++) app.Simulate(Dt);
+                var fish = app.Eco.fish;
+                int pairFrames = 0, deepFrames = 0, frames = 30 * 180, crossed = 0, nearN = 0;
+                float worst = 0, speedSum = 0, nearSum = 0;
+                string worstPair = "";
+                var sw = new System.Diagnostics.Stopwatch();
+                // a pair close together, and which side of b the body of a was on: a flip is one through the other
+                var was = new Dictionary<(int, int), Vector3>();
+                for (int k = 0; k < frames; k++)
+                {
+                    if (k == frames / 2) app.Eco.Feed(0);
+                    sw.Start();
+                    app.Simulate(Dt);
+                    sw.Stop();
+                    for (int i = 0; i < fish.Count; i++)
+                    {
+                        if (fish[i].hidden) continue;
+                        for (int j = i + 1; j < fish.Count; j++)
+                        {
+                            if (fish[j].hidden || (fish[i].pos - fish[j].pos).sqrMagnitude > 4) continue;
+                            float depth = -Aquarium.Fish.FishBodies.Gap(fish[i], fish[j], out var side);
+                            if (depth > -0.12f)
+                            {
+                                if (was.TryGetValue((i, j), out var before) && Vector3.Dot(before, side) < -0.5f) crossed++;
+                                was[(i, j)] = side;
+                            }
+                            else was.Remove((i, j));
+                            if (depth <= 0) continue;
+                            pairFrames++;
+                            if (depth > 0.05f) deepFrames++;
+                            if (depth > worst) { worst = depth; worstPair = $"{fish[i].sp.id} {fish[i].state} / {fish[j].sp.id} {fish[j].state}"; }
+                        }
+                    }
+                    if (k % 15 != 0) continue;
+                    // the swimming goes on, and the schools hold together
+                    foreach (var f in fish)
+                    {
+                        if (f.hidden) continue;
+                        speedSum += f.vel.magnitude / f.sp.swim.cruise;
+                        if (f.sp.school < 0.8f) continue;
+                        float best = float.MaxValue;
+                        foreach (var o in fish)
+                            if (o != f && !o.hidden && o.sp == f.sp) best = Mathf.Min(best, Vector3.Distance(f.pos, o.pos) / f.sp.len);
+                        if (best < float.MaxValue) { nearSum += best; nearN++; }
+                    }
+                }
+                float minutes = frames * Dt / 60;
+                int meals = fish.Sum(f => f.mem.meals), shown = fish.Count(f => !f.hidden);
+                Debug.Log($"OVERLAP bodies {(on ? "on" : "off")}: {shown} fish, touching {pairFrames * Dt / minutes:0.0} pair-seconds a minute, more than 0.05 deep {deepFrames * Dt / minutes:0.0}, deepest {worst:0.000} ({worstPair}), went through {crossed} times, speed {speedSum / (frames / 15 * shown):0.00} of cruise, nearest schoolmate {nearSum / Mathf.Max(1, nearN):0.00} lengths, meals {meals}, food left {app.Eco.food.Count}, pushed {Aquarium.Fish.FishBodies.Pushed / shown / (frames * Dt):0.0000} units a second per fish, simulation {sw.Elapsed.TotalMilliseconds / frames:0.00} ms a step");
+            }
+            Aquarium.Fish.FishBodies.On = true;
+        }
+
         /// <summary>Feed a fresh aquarium and report how the fish react (numbers, no pictures).</summary>
         public static void FeedCheck()
         {

@@ -72,6 +72,9 @@ namespace Aquarium.Fish
         public float Escaping => escapeT;
         public float yawRate, pitch, tail = 0.5f, pectF, pectBrake, pectS, pectB, idleScull, phase, finPhase, burstT, burst, gulp, flare, speedMul = 1;
         public Vector3? face;
+        // FishBodies: what is left of this frame's pushing; the last touch, which it turns away from
+        public float pushLeft;
+        Vector3 bump;
 
         // needs & mind
         public float hunger, fear, stateT, stateDur, thinkT;
@@ -888,6 +891,33 @@ namespace Aquarium.Fish
                     float d = Mathf.Sqrt(d2) + 1e-4f, f = (o.size * 1.4f - d) * 3 * (0.5f + p("shyness"));
                     acc.x -= dx / d * f; acc.y -= dy / d * f * 0.5f; acc.z -= dz / d * f;
                 }
+                // on a course into it within a second: turn aside in good time, the lighter fish more
+                if (FishBodies.On && d2 < 6.25f)
+                {
+                    var closing = vel - o.vel;
+                    float c2 = closing.sqrMagnitude;
+                    var toO = new Vector3(dx, dy, dz);
+                    float when = c2 > 0.01f ? Vector3.Dot(toO, closing) / c2 : -1;
+                    if (when > 0 && when < 1)
+                    {
+                        var miss = toO - closing * when;
+                        float clear = Girth + o.Girth + (size + o.size) * 0.3f;
+                        float m2 = miss.sqrMagnitude;
+                        if (m2 < clear * clear)
+                        {
+                            float md = Mathf.Sqrt(m2);
+                            // dead ahead each keeps to its own right, and they pass
+                            var away = md > 1e-3f ? -miss / md : Vector3.Cross(Up, heading).normalized;
+                            float share = 2 * o.size * o.size * o.size / (size * size * size + o.size * o.size * o.size);
+                            acc += away * ((1 - when) * (1 - md / clear) * S.accel * 2.5f * Mathf.Clamp(share, 0.3f, 1.7f));
+                        }
+                    }
+                }
+            }
+            if (bump.sqrMagnitude > 1e-4f)
+            {
+                acc += bump * (S.accel * 0.8f);
+                bump *= Mathf.Exp(-dt * 5);
             }
             if (n > 0)
             {
@@ -942,7 +972,7 @@ namespace Aquarium.Fish
             if (pos.z > BoundsZMax - m) acc.z -= (pos.z - (BoundsZMax - m)) * 14;
             if (pos.z < BoundsZMin + m) acc.z += (BoundsZMin + m - pos.z) * 14;
             if (pos.y < floor + 0.15f) acc.y += (floor + 0.15f - pos.y) * 16;
-            float ceil = state == FishState.EAT || state == FishState.AIR ? 5.55f : BoundsYMax - 0.1f;
+            float ceil = Ceiling;
             if (pos.y > ceil) acc.y -= (pos.y - ceil) * 16;
             // shy fish keep away from the pointer
             if (eco.cursor.active && p("shyness") > 0.55f)
@@ -1039,12 +1069,29 @@ namespace Aquarium.Fish
                 pos += step / steps;
                 if (field != null) KeepOutOfDecor();
             }
-            // hard limits (the decor has the last word: they must not push the fish back into it)
+            Confine();
+        }
+
+        float Ceiling => state == FishState.EAT || state == FishState.AIR ? 5.55f : BoundsYMax - 0.1f;
+
+        /// <summary>Hard limits (the decor has the last word: they must not push the fish back into it).</summary>
+        public void Confine()
+        {
             pos.x = Mathf.Clamp(pos.x, -BoundsX - 0.1f, BoundsX + 0.1f);
             pos.z = Mathf.Clamp(pos.z, BoundsZMin - 0.1f, BoundsZMax + 0.1f);
             float hf = eco.HeightAt(pos.x, pos.z) + (sp.bottom ? 0.05f : sp.height * 0.35f);
-            pos.y = Mathf.Clamp(pos.y, hf, ceil + 0.05f);
-            if (field != null) KeepOutOfDecor();
+            pos.y = Mathf.Clamp(pos.y, hf, Ceiling + 0.05f);
+            if (eco.field != null) KeepOutOfDecor();
+        }
+
+        /// <summary>Moved by another body, as far as this frame's pushing still allows; it turns away from the touch. Returns how far.</summary>
+        public float Push(Vector3 dir, float by)
+        {
+            float moved = Mathf.Min(by, pushLeft);
+            pos += dir * moved;
+            pushLeft -= moved;
+            bump = dir;
+            return moved;
         }
 
         /// <summary>The body along its length: where (of its length from the middle, the nose ahead) and how thick

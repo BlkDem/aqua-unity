@@ -47,6 +47,26 @@ namespace Aquarium.PlayTests
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator FishDoNotSwimThroughEachOther()
+        {
+            yield return null;
+            var app = Object.FindAnyObjectByType<AquariumApp>();
+            var fish = app.Eco.fish;
+            Random.InitState(5);
+            app.Eco.Feed(0);   // the crowding is at the food
+            float deepest = 0;
+            for (int step = 0; step < 30 * 60; step++)
+            {
+                app.Simulate(1 / 30f);
+                for (int i = 0; i < fish.Count; i++)
+                    for (int j = i + 1; j < fish.Count; j++)
+                        if (!fish[i].hidden && !fish[j].hidden)
+                            deepest = Mathf.Max(deepest, -FishBodies.Gap(fish[i], fish[j], out _));
+            }
+            Assert.Less(deepest, 0.15f, "bodies overlap");   // without keeping apart: over 0.5 in three minutes
+        }
+
         static IEnumerator Wait(float s)
         {
             float end = Time.realtimeSinceStartup + s;
